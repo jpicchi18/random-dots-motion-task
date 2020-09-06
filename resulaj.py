@@ -37,7 +37,6 @@ noise_update_type = "incoherent_direction_update"   #how to update noise dots --
 coherence_choices = [0, .032, .064, .128, .256, .512]
 time_between_trials = 3 # in seconds
 
-# SAFE CHOICE TRIALS PARAMS
 '''
 safe choice score values = [none, correct, wrong, safe]
 safe_choice_time_bounds = [min, max], where the time is selected randomly within that range
@@ -68,6 +67,10 @@ directory_name = ""
 
 target_angle = 30 # angle of target relative to vertical
 
+target_persistence_time = 3 # seconds that targets remain displayed after stimulus gets hidden
+
+
+
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@@@@
@@ -78,7 +81,8 @@ pygame.init()
 
 # Set task display to be full screen
 monitor = pygame.display.Info()
-screen = pygame.display.set_mode((monitor.current_w, monitor.current_h))
+# screen = pygame.display.set_mode((monitor.current_w, monitor.current_h))
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 pygame.display.set_caption('RDM Task')
 # X,Y coord of screen center = aperture center
 x_screen_center = pygame.Rect((0,0),(monitor.current_w, monitor.current_h)).centerx
@@ -135,10 +139,10 @@ def init_aperture_param():
     aperture_axis = [horizontal_axis, vertical_axis]
     return aperture_axis
 
-def draw_text(surface, text, size, x, y):
+def draw_text(surface, text, size, x, y, color):
     font_name = pygame.font.match_font('arial')
     font = pygame.font.Font(font_name, size)
-    text_surface = font.render(text, True, WHITE)
+    text_surface = font.render(text, True, color)
     text_rect = text_surface.get_rect()
     text_rect.midtop = (x, y)
     surface.blit(text_surface, text_rect)
@@ -151,20 +155,18 @@ def get_dot_positions(dot_array):
         dot_positions.append([dot.x, dot.y])
     return dot_positions
 
-def resulaj_test(coherence, is_right, trial_num, score, time_limit, experiment):
+def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
     clock = pygame.time.Clock()
     trial_dict = {} # where we will record all data for this trial, including the following...
     dot_positions = {}
     cursor_positions = {}
+    waiting_period = False
     stimulus_on = True
-    trial_done = False
     target_selected = 0
-    trial_done_time = time_limit + time_between_trials
+    trial_done_time = time_limit + target_persistence_time + time_between_trials # when to leave the function
+    experiment_done_time = time_limit + target_persistence_time # when to turn off stimulus and targets
     end_time = 0
-    if experiment:
-        filename = "resulaj_experiment.csv"
-    else:
-        filename = "resulaj_control.csv"
+    filename = "resulaj_control.csv"
 
     # set the initial cursor position
     initial_cursor_position = [0.5*monitor.current_w, .8*monitor.current_h]
@@ -202,43 +204,66 @@ def resulaj_test(coherence, is_right, trial_num, score, time_limit, experiment):
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
 
-        # check timer
+        # get current time
         current_time = pygame.time.get_ticks()-start_time
-        # end the trial if we've passed the 3 min post-trial break
+
+        # check if user closed the window or pressed the "esc" key --> if so, exit the program
+        # if user pressed the "n" key --> jump to the wait period before the next trial
+        pressed = pygame.key.get_pressed()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: # check if user clicked the red x
+                pygame.quit()
+                print("early program termination", file = sys.stderr)
+                exit(1)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    print("early program termination", file = sys.stderr)
+                    exit(1)
+                elif event.key == pygame.K_n:
+                    experiment_done_time = current_time/1000
+
+        # end the trial if we've passed the post-trial break
         if (current_time > trial_done_time*1000):
             running = False
             break
-        # turn off stimulus if experiment time is over
-        if (current_time > time_limit*1000):
-            trial_done = True
-            end_time = current_time
 
-        # Process input (events)
-        for event in pygame.event.get():
-            # check for closing window
-            if event.type == pygame.QUIT:
-                running = False
-                end_time = current_time
-                break
+        # enter the post-trial break if it's time to do so
+        if (current_time > experiment_done_time * 1000 and not waiting_period):
+            waiting_period = True
+            trial_done_time = current_time/1000 + time_between_trials
+        
+        # turn off stimulus (not targets) if it's time to do so
+        if (current_time > time_limit*1000):
+            stimulus_on = False
 
         # turn off stimulus if cursor moved
         if (pygame.mouse.get_rel() != (0,0)):
-            stimulus_on = False
-            # get dot and cursor positions
+            if (stimulus_on):
+                experiment_done_time = current_time/1000 + target_persistence_time
+                stimulus_on = False
+
+        # collect dot and cursor positions if stimulus is off and experiment isn't over yet
+        if (not waiting_period and not stimulus_on):
             dot_positions[current_time] = get_dot_positions(dot_array)
             cursor_positions[current_time] = pygame.mouse.get_pos()
 
         # Update
         screen.fill(background_color)
-        if (not trial_done):
+        if (not waiting_period):
             target_selected = draw_targets(left_target_coords, right_target_coords, target_radius)
             if (target_selected):
-                trial_done = True
+                waiting_period = True
+                stimulus_on = False
                 trial_done_time = current_time/1000 + time_between_trials
                 end_time = current_time
+            
             if stimulus_on:
                 all_sprites.update()
                 all_sprites.draw(screen)
+            elif (not stimulus_on and not waiting_period):
+                sec_remaining = int(experiment_done_time - current_time/1000)
+                draw_text(screen, str(sec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -253,11 +278,10 @@ def resulaj_test(coherence, is_right, trial_num, score, time_limit, experiment):
     trial_dict['target_selected'] = target_selected
     trial_dict['is_right'] = is_right
     
-    # TODO: delete later
     if (target_selected == is_right+1):
-        print("correct")
+        trial_dict['is_correct'] = 1
     else:
-        print("incorrect")
+        trial_dict['is_correct'] = 0
 
     export_csv(trial_dict, filename)
 
