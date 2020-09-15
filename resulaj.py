@@ -36,6 +36,7 @@ noise_update_type = "incoherent_direction_update"   #how to update noise dots --
 
 coherence_choices = [0, .032, .064, .128, .256, .512]
 time_between_trials = 3 # in seconds
+time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
 
 '''
 safe choice score values = [none, correct, wrong, safe]
@@ -109,6 +110,8 @@ aperture_height = monitor.current_h/3;      #How many pixels high the aperture i
 aperture_center_x = x_screen_center      #NOTE: Aperture center is currently equal to center of
                                          #screen
 aperture_center_y = y_screen_center      # (in pixels)
+
+cwd = os.getcwd()
 
 
 '''
@@ -448,12 +451,12 @@ def make_data_dir():
     global directory_name
     
     # create parent "data" directory, if needed
-    if not os.path.exists("./data"):
-        os.mkdir("./data")
+    if not os.path.exists(cwd + "/data"):
+        os.mkdir(cwd + "/data")
 
-    while os.path.exists("./data/experiment_" + str(experiment_num)):
+    while os.path.exists(cwd + "/data/experiment_" + str(experiment_num)):
         experiment_num += 1
-    directory_name = "./data/experiment_" + str(experiment_num) + "/"
+    directory_name = cwd + "/data/experiment_" + str(experiment_num) + "/"
     os.mkdir(directory_name)
 
 def initialize_experiment():
@@ -523,7 +526,6 @@ def draw_targets(left_target_coords, right_target_coords, target_radius):
         pygame.draw.circle(screen, initial_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
         pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
         return 0
-
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@@
