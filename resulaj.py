@@ -15,7 +15,7 @@ GLOBAL VARIABLES @
 trial_choices = {"safe_choice": True, "continuing_evidence": False, "longer_stimulus": False, \
     "limit_COM": False}
 
-n_trials = 2                #number of trials
+n_trials = 2                #number of trialsnd
 
 n_dots = 300                #number of dots per set (equivalent to number of dots per
                              #frame)
@@ -36,7 +36,7 @@ noise_update_type = "incoherent_direction_update"   #how to update noise dots --
 
 coherence_choices = [0, .032, .064, .128, .256, .512]
 time_between_trials = 3 # in seconds
-time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
+time_between_phases = 10 # in sectonds; eg, the time between resulaj control and experiment
 
 '''
 safe choice score values = [none, correct, wrong, safe]

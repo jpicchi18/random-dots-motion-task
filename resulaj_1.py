@@ -35,7 +35,7 @@ noise_update_type = "incoherent_direction_update"   #how to update noise dots --
                                                     # "reset_location"
 
 coherence_choices = [0, .032, .064, .128, .256, .512]
-time_between_trials = 3 # in seconds
+time_between_trials = 0.82 # in seconds
 time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
 
 '''

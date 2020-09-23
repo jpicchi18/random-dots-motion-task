@@ -1,0 +1,6 @@
+altgraph==0.17
+macholib==1.14
+numpy==1.19.2
+pygame==1.9.6
+pyinstaller==4.0
+pyinstaller-hooks-contrib==2020.8
