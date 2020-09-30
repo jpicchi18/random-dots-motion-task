@@ -17,7 +17,7 @@ trial_choices = {"safe_choice": True, "continuing_evidence": False, "longer_stim
 
 n_trials = 50                #number of trials
 
-n_dots = 250                #number of dots per set (equivalent to number of dots per
+n_dots = 300                #number of dots per set (equivalent to number of dots per
                              #frame)
 n_sets = 3                  #number of sets to cycle through per frame
                             #TO-DO: we can probably just delete this ^ parameter
@@ -28,7 +28,7 @@ coherence = 1             #Proportion of dots to move together, range from 0 to 
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 4          #How many pixels the dots move per frame
+move_distance = 3          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
@@ -215,9 +215,6 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
 
-        # keep apropriate loop speed
-        clock.tick(frames_per_second)
-
         # get current time
         current_time = pygame.time.get_ticks()-start_time
 
@@ -276,7 +273,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
                 all_sprites.update()
                 all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time*1000 - current_time))
+                display_countdown(int(experiment_done_time - current_time/1000))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -303,7 +300,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
     return 0
 
 # participant has time after first target selection to change his/her mind
-def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_between_trials):
+def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
     clock = pygame.time.Clock()
     trial_dict = {} # where we will record all data for this trial, including the following...
     dot_positions = {}
@@ -318,7 +315,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
     filename = "resulaj_experiment.csv"
 
     # set the initial cursor position
-    initial_cursor_position = [0.5*monitor.current_w, .9*monitor.current_h]
+    initial_cursor_position = [0.5*monitor.current_w, .8*monitor.current_h]
     pygame.mouse.set_pos(initial_cursor_position)
     pygame.mouse.get_rel()
 
@@ -351,9 +348,6 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
     running = True
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
-
-        # keep apropriate loop speed
-        clock.tick(frames_per_second)
 
         # get current time
         current_time = pygame.time.get_ticks()-start_time
@@ -415,7 +409,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
                 all_sprites.update()
                 all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time*1000 - current_time))
+                display_countdown(int(experiment_done_time - current_time/1000))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -441,9 +435,8 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
 
     return 0
 
-def display_countdown(msec_remaining):
-    msec_remaining = int(np.ceil(msec_remaining / 100) * 100)
-    draw_text(screen, str(msec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
+def display_countdown(sec_remaining):
+    draw_text(screen, str(sec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
 
 def export_csv(result_dict, filename):
     

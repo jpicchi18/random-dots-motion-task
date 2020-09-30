@@ -17,9 +17,9 @@ trial_choices = {"safe_choice": True, "continuing_evidence": False, "longer_stim
 
 n_trials = 50                #number of trials
 
-n_dots = 250                #number of dots per set (equivalent to number of dots per
+n_dots = 300                #number of dots per set (equivalent to number of dots per
                              #frame)
-n_sets = 3                  #number of sets to cycle through per frame
+n_sets = 1                  #number of sets to cycle through per frame
                             #TO-DO: we can probably just delete this ^ parameter
 #coherent_direction = 0;   # OBSOLETE: The direction of the coherentDots in degrees
                             #Starts at 3 o'clock and goes counterclockwise (0 ==
@@ -28,7 +28,7 @@ coherence = 1             #Proportion of dots to move together, range from 0 to 
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 4          #How many pixels the dots move per frame
+move_distance = 3          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
@@ -68,7 +68,7 @@ directory_name = ""
 
 target_angle = 28 # angle of target relative to vertical
 
-target_persistence_time = 1 # seconds that targets remain displayed after stimulus gets hidden
+target_persistence_time = 2 # seconds that targets remain displayed after stimulus gets hidden
 
 change_mind_time = 3 # seconds that participant is given to change mind after initial target selection
 
@@ -76,7 +76,7 @@ target_radius = 1.5 # in cm
 
 target_dist_from_start = 20 # in cm
 
-frames_per_second = 30
+
 
 
 '''
@@ -215,9 +215,6 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
 
-        # keep apropriate loop speed
-        clock.tick(frames_per_second)
-
         # get current time
         current_time = pygame.time.get_ticks()-start_time
 
@@ -276,7 +273,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
                 all_sprites.update()
                 all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time*1000 - current_time))
+                display_countdown(int(experiment_done_time - current_time/1000))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -352,9 +349,6 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
 
-        # keep apropriate loop speed
-        clock.tick(frames_per_second)
-
         # get current time
         current_time = pygame.time.get_ticks()-start_time
 
@@ -415,7 +409,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
                 all_sprites.update()
                 all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time*1000 - current_time))
+                display_countdown(int(experiment_done_time - current_time/1000))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -441,9 +435,8 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
 
     return 0
 
-def display_countdown(msec_remaining):
-    msec_remaining = int(np.ceil(msec_remaining / 100) * 100)
-    draw_text(screen, str(msec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
+def display_countdown(sec_remaining):
+    draw_text(screen, str(sec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
 
 def export_csv(result_dict, filename):
     
@@ -475,15 +468,10 @@ def initialize_experiment():
 
 def run_resulaj_test():
     for i in range(n_trials):
-        resulaj_test_control(np.random.choice(coherence_choices), \
+        resulaj_test_experiment(np.random.choice(coherence_choices), \
             np.random.choice([0,1]), i, \
                 np.random.uniform(time_bounds[0], time_bounds[1]), \
                     np.random.uniform(time_between_trials[0], time_between_trials[1]))
-
-    # for i in range(n_trials):
-    #     safe_choice_score = resulaj_test_experiment(np.random.choice(coherence_choices), \
-    #         np.random.choice([0,1]), i, score, \
-    #             np.random.uniform(time_bounds[0], time_bounds[1]))
 
 # calculate positions for the left and right targets
 # return 2 lists, first one containing the left coordinates, second one with the right coordinates

@@ -15,27 +15,27 @@ GLOBAL VARIABLES @
 trial_choices = {"safe_choice": True, "continuing_evidence": False, "longer_stimulus": False, \
     "limit_COM": False}
 
-n_trials = 2                #number of trials
+n_trials = 50                #number of trials
 
-n_dots = 300                #number of dots per set (equivalent to number of dots per
+n_dots = 250                #number of dots per set (equivalent to number of dots per
                              #frame)
-n_sets = 1                  #number of sets to cycle through per frame
+n_sets = 3                  #number of sets to cycle through per frame
                             #TO-DO: we can probably just delete this ^ parameter
 #coherent_direction = 0;   # OBSOLETE: The direction of the coherentDots in degrees
                             #Starts at 3 o'clock and goes counterclockwise (0 ==
                             #90 == upwards, 180 == leftwards, 270 == downwards), range 0 - 360
 coherence = 1             #Proportion of dots to move together, range from 0 to 1
-dot_radius = 3             #Radius of each dot in pixels
+dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 3          #How many pixels the dots move per frame
+move_distance = 4          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
                                                     # "reset_location"
 
-coherence_choices = [0, .032, .064, .128, .256, .512]
-time_between_trials = 0.82 # in seconds
+coherence_choices = [0, .016, .032, .064, .128, .256]
+time_between_trials = [0.7, 1.0] # time bounds, in seconds
 time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
 
 '''
@@ -66,13 +66,17 @@ frames_per_second = 30
 
 directory_name = ""
 
-target_angle = 30 # angle of target relative to vertical
+target_angle = 28 # angle of target relative to vertical
 
-target_persistence_time = 3 # seconds that targets remain displayed after stimulus gets hidden
+target_persistence_time = 1 # seconds that targets remain displayed after stimulus gets hidden
 
-change_mind_time = 3 # seconds that participant is given to change mind after initial target selection
+change_mind_time = 1 # seconds that participant is given to change mind after initial target selection
 
+target_radius = 1.5 # in cm
 
+target_dist_from_start = 20 # in cm
+
+frames_per_second = 30
 
 
 '''
@@ -102,16 +106,18 @@ dot_color = WHITE         #Color of the dots
 background_color = GRAY   #Color of the background
 initial_target_color = BLACK
 selected_target_color = BLUE
-aperture_width = monitor.current_w/4;       #How many pixels wide the aperture is. For square aperture this
+aperture_width = monitor.current_w/5;       #How many pixels wide the aperture is. For square aperture this
                             #will be the both height and width. For circle, this will be
                             #the diameter.
-aperture_height = monitor.current_h/3;      #How many pixels high the aperture is. Only relevant for ellipse
+aperture_height = monitor.current_h/4;      #How many pixels high the aperture is. Only relevant for ellipse
                             #and rectangle apertures. For circle and square, this is ignored.
 aperture_center_x = x_screen_center      #NOTE: Aperture center is currently equal to center of
                                          #screen
 aperture_center_y = y_screen_center      # (in pixels)
 
 cwd = os.getcwd()
+
+target_radius = int(target_radius * 37.8)
 
 
 '''
@@ -161,7 +167,7 @@ def get_dot_positions(dot_array):
     return dot_positions
 
 # normal resulaj implementation
-def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
+def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_between_trials):
     clock = pygame.time.Clock()
     trial_dict = {} # where we will record all data for this trial, including the following...
     dot_positions = {}
@@ -175,12 +181,11 @@ def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
     filename = "resulaj_control.csv"
 
     # set the initial cursor position
-    initial_cursor_position = [0.5*monitor.current_w, .8*monitor.current_h]
+    initial_cursor_position = [0.5*monitor.current_w, .9*monitor.current_h]
     pygame.mouse.set_pos(initial_cursor_position)
     pygame.mouse.get_rel()
 
     # get target parameters
-    target_radius = int(.05*monitor.current_w)
     left_target_coords, right_target_coords = get_target_positions(initial_cursor_position[1])
 
     #calculate the number of coherent and incoherent dots
@@ -209,6 +214,9 @@ def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
     running = True
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
+
+        # keep apropriate loop speed
+        clock.tick(frames_per_second)
 
         # get current time
         current_time = pygame.time.get_ticks()-start_time
@@ -257,7 +265,7 @@ def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
         # Update
         screen.fill(background_color)
         if (not waiting_period):
-            target_selected = draw_targets(left_target_coords, right_target_coords, target_radius)
+            target_selected = draw_targets(left_target_coords, right_target_coords)
             if (target_selected):
                 waiting_period = True
                 stimulus_on = False
@@ -268,7 +276,7 @@ def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
                 all_sprites.update()
                 all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time - current_time/1000))
+                display_countdown(int(experiment_done_time*1000 - current_time))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -295,7 +303,7 @@ def resulaj_test_control(coherence, is_right, trial_num, score, time_limit):
     return 0
 
 # participant has time after first target selection to change his/her mind
-def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
+def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_between_trials):
     clock = pygame.time.Clock()
     trial_dict = {} # where we will record all data for this trial, including the following...
     dot_positions = {}
@@ -310,12 +318,11 @@ def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
     filename = "resulaj_experiment.csv"
 
     # set the initial cursor position
-    initial_cursor_position = [0.5*monitor.current_w, .8*monitor.current_h]
+    initial_cursor_position = [0.5*monitor.current_w, .9*monitor.current_h]
     pygame.mouse.set_pos(initial_cursor_position)
     pygame.mouse.get_rel()
 
     # get target parameters
-    target_radius = int(.05*monitor.current_w)
     left_target_coords, right_target_coords = get_target_positions(initial_cursor_position[1])
 
     #calculate the number of coherent and incoherent dots
@@ -344,6 +351,9 @@ def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
     running = True
     start_time = pygame.time.get_ticks() # in milliseconds
     while running:
+
+        # keep apropriate loop speed
+        clock.tick(frames_per_second)
 
         # get current time
         current_time = pygame.time.get_ticks()-start_time
@@ -392,7 +402,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
         # Update
         screen.fill(background_color)
         if (not waiting_period):
-            target_selected = draw_targets(left_target_coords, right_target_coords, target_radius)
+            target_selected = draw_targets(left_target_coords, right_target_coords)
             if (target_selected):
                 stimulus_on = False
                 if (first_selection):
@@ -405,7 +415,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
                 all_sprites.update()
                 all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time - current_time/1000))
+                display_countdown(int(experiment_done_time*1000 - current_time))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -431,8 +441,9 @@ def resulaj_test_experiment(coherence, is_right, trial_num, score, time_limit):
 
     return 0
 
-def display_countdown(sec_remaining):
-    draw_text(screen, str(sec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
+def display_countdown(msec_remaining):
+    msec_remaining = int(np.ceil(msec_remaining / 100) * 100)
+    draw_text(screen, str(msec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
 
 def export_csv(result_dict, filename):
     
@@ -463,22 +474,22 @@ def initialize_experiment():
     make_data_dir()
 
 def run_resulaj_test():
-    score = 0
+    for i in range(n_trials):
+        resulaj_test_experiment(np.random.choice(coherence_choices), \
+            np.random.choice([0,1]), i, \
+                np.random.uniform(time_bounds[0], time_bounds[1]), \
+                    np.random.uniform(time_between_trials[0], time_between_trials[1]))
+
     # for i in range(n_trials):
-    #     safe_choice_score = resulaj_test_control(np.random.choice(coherence_choices), \
+    #     safe_choice_score = resulaj_test_experiment(np.random.choice(coherence_choices), \
     #         np.random.choice([0,1]), i, score, \
     #             np.random.uniform(time_bounds[0], time_bounds[1]))
-
-    for i in range(n_trials):
-        safe_choice_score = resulaj_test_experiment(np.random.choice(coherence_choices), \
-            np.random.choice([0,1]), i, score, \
-                np.random.uniform(time_bounds[0], time_bounds[1]))
 
 # calculate positions for the left and right targets
 # return 2 lists, first one containing the left coordinates, second one with the right coordinates
 def get_target_positions(cursor_start_position):
-    # calculate target distance 
-    target_dist = cursor_start_position - 0.1*monitor.current_h
+    # calculate target distance --> 20 cm from start position
+    target_dist = target_dist_from_start * 38.7
     
     # calculate y vals
     height = target_dist*np.cos((np.pi/180) * target_angle)
@@ -492,7 +503,7 @@ def get_target_positions(cursor_start_position):
     return [int(left_x), int(y_coord)], [int(right_x), int(y_coord)]
 
 # return 1 for cursor in left target, 2 for cursor in right target, 0 otherwise
-def check_cursor_in_target(left_target_coords, right_target_coords, target_radius):
+def check_cursor_in_target(left_target_coords, right_target_coords):
     x, y = pygame.mouse.get_pos()
 
     # check if it's in left target
@@ -511,8 +522,8 @@ def check_cursor_in_target(left_target_coords, right_target_coords, target_radiu
 
 # draw targets for resulaj experiment, returning 1 if a left target is selected, 2 for right target,
 # 0 if none selected
-def draw_targets(left_target_coords, right_target_coords, target_radius):
-    target_selected = check_cursor_in_target(left_target_coords, right_target_coords, target_radius)
+def draw_targets(left_target_coords, right_target_coords):
+    target_selected = check_cursor_in_target(left_target_coords, right_target_coords)
     
     if (target_selected == 1):
         pygame.draw.circle(screen, selected_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
