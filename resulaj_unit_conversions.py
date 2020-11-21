@@ -139,8 +139,8 @@ FUNCTION DEFINITIONS @
 
 
 def angle_to_pixelRadius(visualangle, distanceFromScreen):
-    int radius = np.tan(visualangle/2) * distanceFromScreen
-    return radius* 37.8
+    radius = np.tan((visualangle * 3.14 / 180)/2) * distanceFromScreen
+    return radius * 37.8
 
 
 
