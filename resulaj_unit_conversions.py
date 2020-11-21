@@ -131,6 +131,13 @@ FUNCTION DEFINITIONS @
 @@@@@@@@@@@@@@@@@@@@@@
 '''
 
+def angle_to_pixelRadius(visualangle, distanceFromScreen):
+    int radius = np.tan(visualangle/2) * distanceFromScreen
+    return radius* 37.8
+
+
+
+
 #calculates coherent_jump_size_x based on global variables coherent_direction and
 #move_distance
 def calculate_coherent_jump_size_x(coherent_direction):
