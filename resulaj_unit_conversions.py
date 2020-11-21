@@ -140,7 +140,6 @@ def angle_to_pixelRadius(visualangle, distanceFromScreen):
     radius = np.tan((visualangle * 3.14 / 180)/2) * distanceFromScreen
     return radius * 37.8
 
-
 #calculates coherent_jump_size_x based on global variables coherent_direction and
 #move_distance
 def calculate_coherent_jump_size_x(coherent_direction):
