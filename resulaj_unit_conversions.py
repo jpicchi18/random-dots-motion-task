@@ -30,7 +30,7 @@ n_sets = 3                  #number of sets to cycle through per frame
                             #Starts at 3 o'clock and goes counterclockwise (0 ==
                             #90 == upwards, 180 == leftwards, 270 == downwards), range 0 - 360
 coherence = 1             #Proportion of dots to move together, range from 0 to 1
-dot_radius = 2             #Radius of each dot in pixels
+dot_radius = 3             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
 move_distance = 4          #How many pixels the dots move per frame

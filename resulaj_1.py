@@ -1,3 +1,4 @@
+# LITERATURE VALUES:
 # diameter of aperture = 10-14 degrees
 # density = ~16.7 dots/(degree)^2/sec
 # frequency (1/(time between frames)) = 75 Hz
@@ -17,18 +18,10 @@ GLOBAL VARIABLES @
 @@@@@@@@@@@@@@@@@@
 '''
 
-trial_choices = {"safe_choice": True, "continuing_evidence": False, "longer_stimulus": False, \
-    "limit_COM": False}
+n_trials = 50
+n_dots = 250 # per set
+n_sets = 3 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
-n_trials = 50                #number of trials
-
-n_dots = 250                #number of dots per set (equivalent to number of dots per
-                             #frame)
-n_sets = 3                  #number of sets to cycle through per frame
-                            #TO-DO: we can probably just delete this ^ parameter
-#coherent_direction = 0;   # OBSOLETE: The direction of the coherentDots in degrees
-                            #Starts at 3 o'clock and goes counterclockwise (0 ==
-                            #90 == upwards, 180 == leftwards, 270 == downwards), range 0 - 360
 coherence = 1             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
