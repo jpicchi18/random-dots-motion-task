@@ -75,6 +75,8 @@ target_radius = 1.5 # in cm
 target_dist_from_start = 20 # in cm
 
 
+
+
 '''
 @@@@@@@@@@@@@@@@@@@@@@@@@
 SET UP CANVAS, APERTURE @
@@ -98,6 +100,8 @@ WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
+selected_start_color= BLUE
+start_color=RED
 dot_color = WHITE         #Color of the dots
 background_color = GRAY   #Color of the background
 initial_target_color = BLACK
@@ -115,6 +119,9 @@ cwd = os.getcwd()
 
 target_radius = int(target_radius * 37.8)
 
+start_coords= [0.5*monitor.current_w, .9*monitor.current_h]
+
+start_radius = 1
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@
@@ -323,7 +330,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
     filename = "resulaj_experiment.csv"
 
     # set the initial cursor position
-    initial_cursor_position = [0.5*monitor.current_w, .9*monitor.current_h]
+    initial_cursor_position = [0.3*monitor.current_w, .9*monitor.current_h]
     pygame.mouse.set_pos(initial_cursor_position)
     pygame.mouse.get_rel()
 
@@ -542,6 +549,28 @@ def draw_targets(left_target_coords, right_target_coords):
         pygame.draw.circle(screen, initial_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
         pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
         return 0
+
+#check if cursor in start circle, return 1 if so and zero else
+def check_cursor_in_start(start_coords):
+    x, y = pygame.mouse.get_pos()
+
+    # check if it's in start
+    x_dist_from_start = np.abs(x - start_coords[0])
+    y_dist_from_start = np.abs(y - start_coords[1])
+    if ((x_dist_from_start**2 + y_dist_from_start**2)**0.5 <= start_radius):
+        return 1
+    return 0
+
+
+def draw_start(start_coords):
+    start_selected= check_cursor_in_start(start_coords)
+    if (start_selected==1):
+        pygame.draw.circle(screen, selected_start_color, (start_coords[0], start_coords[1]), start_radius, 6)
+        return 1
+    else :
+        pygame.draw.circle(screen, start_color, (start_coords[0], start_coords[1]), start_radius, 6)
+        return 0
+
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@@
@@ -799,8 +828,9 @@ def main():
     #             np.random.uniform(safe_choice_time_bounds[0], safe_choice_time_bounds[1]), False)
     #     pygame.time.delay(time_between_trials)
 
-    run_resulaj_test()
-    # pygame.time.delay(5)
+    #run_resulaj_test()
+    pygame.time.delay(5)
+   
 
     # safe_choice_score = 0
     # for i in range(n_trials):
