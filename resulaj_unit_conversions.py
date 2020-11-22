@@ -136,6 +136,7 @@ def find_ndots(visual_angle, density):
     radius = angle_to_pixel_radius(visual_angle)
     return np.rint(density*np.pi*radius*radius)
 
+#converts visual angle into aperture radius in pixels
 def angle_to_pixelRadius(visualangle, distanceFromScreen):
     radius = np.tan((visualangle * 3.14 / 180)/2) * distanceFromScreen
     return radius * 37.8
