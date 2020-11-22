@@ -565,10 +565,10 @@ def check_cursor_in_start(start_coords):
 def draw_start(start_coords):
     start_selected= check_cursor_in_start(start_coords)
     if (start_selected==1):
-        pygame.draw.circle(screen, selected_start_color, (start_coords[0], start_coords[1]), start_radius, 6)
+        pygame.draw.circle(screen, selected_start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
         return 1
     else :
-        pygame.draw.circle(screen, start_color, (start_coords[0], start_coords[1]), start_radius, 6)
+        pygame.draw.circle(screen, start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
         return 0
 
 
@@ -829,7 +829,10 @@ def main():
     #     pygame.time.delay(time_between_trials)
 
     #run_resulaj_test()
-    pygame.time.delay(5)
+    screen.fill(background_color)
+    draw_start(start_coords)
+    pygame.display.update()
+    pygame.time.delay(5000)
    
 
     # safe_choice_score = 0
