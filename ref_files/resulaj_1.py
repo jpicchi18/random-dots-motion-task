@@ -531,6 +531,20 @@ def draw_targets(left_target_coords, right_target_coords):
         pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
         return 0
 
+#check if cursor in start circle, return 1 if so and zero else
+def check_cursor_in_start(start_coords):
+    x, y = pygame.mouse.get_pos()
+
+    # check if it's in start
+    x_dist_from_left = np.abs(x - start_coords[0])
+    y_dist_from_left = np.abs(y - start_coords[1])
+    if ((x_dist_from_start**2 + y_dist_from_start**2)**0.5 <= target_radius):
+        return 1
+    return 0
+
+
+def draw_start(start_coords):
+
 '''
 @@@@@@@@@@@@@@@@@@@@@@@
 MORE GLOBAL VARIABLES @
