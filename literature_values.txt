@@ -1,0 +1,17 @@
+LITERATURE VALUES:
+diameter of aperture = 10-14 degrees
+density = ~16.7 dots/(degree)^2/sec or 15.6 dots/(degree)^2/sec (flexible variable)
+frequency (1/(time between frames)) = 75 Hz
+target = .8 deg diameter 10 deg from midline
+dot speed = 7.1 deg/sec
+home position = filled circle of radius 1cm
+target positions = circles of radius 1.5 cm, 20 cm from home and 28 deg from midline
+cross in the middle of the aperture that participants had to focus on throughout trials
+viewing distance of 40cm (used chin and headrest to make it consistent)
+
+TIMING DURING THE TRIAL:
+before stimulus appears, targets displayed for some time in exponential distribution with mean 0.82s and range 0.7-1.0s
+participants could view for as long as needed up to 2.0s
+movement duration (time between leaving home position and selecting a target) required to be 500+/-200ms
+feedback on accuracy came after the response or 2.0s after onset of the stimulus (whichever is later)
+intertrial interval = 1.0s with blank screen
