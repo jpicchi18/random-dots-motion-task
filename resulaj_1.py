@@ -74,8 +74,6 @@ target_radius = 1.5 # in cm
 
 target_dist_from_start = 20 # in cm
 
-frames_per_second = 30
-
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@@@@
@@ -123,6 +121,15 @@ target_radius = int(target_radius * 37.8)
 FUNCTION DEFINITIONS @
 @@@@@@@@@@@@@@@@@@@@@@
 '''
+
+#calculates number of dots in the field based on the radius of aperture and dot density
+def find_ndots(visual_angle, density):
+    radius = angle_to_pixel_radius(visual_angle)
+    return np.rint(density*np.pi*radius*radius)
+
+def angle_to_pixelRadius(visualangle, distanceFromScreen):
+    radius = np.tan((visualangle * 3.14 / 180)/2) * distanceFromScreen
+    return radius * 37.8
 
 #calculates coherent_jump_size_x based on global variables coherent_direction and
 #move_distance
