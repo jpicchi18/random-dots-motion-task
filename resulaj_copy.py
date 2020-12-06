@@ -2,7 +2,7 @@
 # diameter of aperture = 10-14 degrees
 # density = ~16.7 dots/(degree)^2/sec
 # frequency (1/(time between frames)) = 75 Hz
-# target = .8 deg diameter 10 deg from 
+# target = .8 deg diameter 10 deg from
 
 #!/usr/bin/python3
 import sys
@@ -26,6 +26,9 @@ coherence = .8             #Proportion of dots to move together, range from 0 to
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
+dot_speed = 7.1 #speed of the dot in units of deg/sec
+dot_density = 16.7 #density of the dots in dots/(degree)^2/sec
+
 move_distance = 2          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
@@ -35,6 +38,11 @@ noise_update_type = "incoherent_direction_update"   #how to update noise dots --
 coherence_choices = [0, .016, .032, .064, .128, .256]
 time_between_trials = [0.7, 1.0] # time bounds, in seconds
 time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
+
+aperture_radius = 5 #radius of the aperature in visual degrees
+target_radius = 0.4 #radius of the targets in visual degrees
+frequency = 75 #frequency at which the dots change in Hz
+screen_distance = 35 #distance between user and the computer screen with the stimulus in cm
 
 '''
 safe choice score values = [none, correct, wrong, safe]
@@ -122,9 +130,14 @@ FUNCTION DEFINITIONS @
 @@@@@@@@@@@@@@@@@@@@@@
 '''
 
+#converts density from dots/(degree)^2/sec to dots/(pixel)^2/sec
+def convert_density(dot_density):
+    conversion_factor = 1/angle_to_pixelRadius(aperature_radius, screen_distance) #need to convert between deg to pixel
+    return dot_density*conversion_factor**2
+
 #calculates number of dots in the field based on the radius of aperture and dot density
-def find_ndots(visual_angle, density):
-    radius = angle_to_pixel_radius(visual_angle)
+def find_ndots(visual_angle, dot_density):
+    radius = angle_to_pixelRadius(visual_angle)
     return np.rint(density*np.pi*radius*radius)
 
 #converts visual angle into aperture radius in pixels
@@ -241,7 +254,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
         if (current_time > experiment_done_time * 1000 and not waiting_period):
             waiting_period = True
             trial_done_time = current_time/1000 + time_between_trials
-        
+
         # turn off stimulus (not targets) if it's time to do so
         if (current_time > time_limit*1000):
             stimulus_on = False
@@ -266,7 +279,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
                 stimulus_on = False
                 trial_done_time = current_time/1000 + time_between_trials
                 end_time = current_time
-            
+
             if stimulus_on:
                 dot_sets.update()
                 dot_sets.draw()
@@ -285,7 +298,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
     trial_dict['end_time'] = end_time
     trial_dict['target_selected'] = target_selected
     trial_dict['is_right'] = is_right
-    
+
     if (target_selected == is_right+1):
         trial_dict['is_correct'] = 1
     else:
@@ -367,7 +380,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
         if (current_time > experiment_done_time * 1000 and not waiting_period):
             waiting_period = True
             trial_done_time = current_time/1000 + time_between_trials
-        
+
         # turn off stimulus (not targets) if it's time to do so
         if (current_time > time_limit*1000):
             stimulus_on = False
@@ -394,7 +407,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
                     experiment_done_time = current_time/1000 + change_mind_time
                     first_selection = False
                 end_time = current_time
-            
+
             if stimulus_on:
                 dot_set.update()
                 dot_set.draw()
@@ -413,7 +426,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
     trial_dict['end_time'] = end_time
     trial_dict['target_selected'] = target_selected
     trial_dict['is_right'] = is_right
-    
+
     if (target_selected == is_right+1):
         trial_dict['is_correct'] = 1
     else:
@@ -430,7 +443,7 @@ def display_countdown(msec_remaining):
     draw_text(screen, str(msec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
 
 def export_csv(result_dict, filename):
-    
+
     # Can adjust later to a customized file name
     if os.path.exists(directory_name + filename):
         with open(directory_name + filename, 'a') as f:
@@ -444,7 +457,7 @@ def export_csv(result_dict, filename):
 def make_data_dir():
     experiment_num = 0
     global directory_name
-    
+
     # create parent "data" directory, if needed
     if not os.path.exists(cwd + "/data"):
         os.mkdir(cwd + "/data")
@@ -474,11 +487,11 @@ def run_resulaj_test():
 def get_target_positions(cursor_start_position):
     # calculate target distance --> 20 cm from start position
     target_dist = target_dist_from_start * 38.7
-    
+
     # calculate y vals
     height = target_dist*np.cos((np.pi/180) * target_angle)
     y_coord = cursor_start_position - height
-    
+
     # calculate x vals
     x_offset = target_dist*np.sin((np.pi/180) * target_angle)
     left_x = 0.5 * monitor.current_w - x_offset
@@ -508,7 +521,7 @@ def check_cursor_in_target(left_target_coords, right_target_coords):
 # 0 if none selected
 def draw_targets(left_target_coords, right_target_coords):
     target_selected = check_cursor_in_target(left_target_coords, right_target_coords)
-    
+
     if (target_selected == 1):
         pygame.draw.circle(screen, selected_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
         pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
@@ -614,7 +627,7 @@ class dot(pygame.sprite.Sprite):
         if (aperture_type == 1):
             self.x = np.random.uniform(-1, 1) * horizontal_axis + aperture_center_x
             self.y = np.random.uniform(-1, 1) * vertical_axis + aperture_center_y
-        
+
         elif (aperture_type == 2):
             NotImplemented
 
@@ -627,7 +640,7 @@ class dot(pygame.sprite.Sprite):
 
         #     # self.x = aperture_center_x + x_coord_from_center
         #     # self.y = aperture_center_y + y_coord_from_center
-            
+
         #     phi = np.random.uniform(0, 2*np.pi)
         #     rho = np.random.random()
 
@@ -680,7 +693,7 @@ class dot(pygame.sprite.Sprite):
         self.y += self.latest_y_move
 
     def update(self):
-        
+
         if self.update_type == "coherent_direction_update":
             self.coherent_direction_update()
         elif self.update_type == "random_walk_update":
@@ -771,10 +784,10 @@ class dot_set:
 
             self.set.append(new_dot)
             self.sprite_group.add(new_dot)
-    
+
     def update(self):
         self.sprite_group.update()
-    
+
     # returns an array of dot positions coordinates (x, y)
     def get_dot_positions(self):
         return get_dot_positions(self.set)
@@ -797,12 +810,12 @@ class set_of_dot_sets:
         self.current_set_index += 1
         if (self.current_set_index >= len(self.set_of_dot_sets)):
             self.current_set_index = 0
-        
+
         self.set_of_dot_sets[self.current_set_index].update()
-    
+
     def get_dot_positions(self):
         return self.set_of_dot_sets[self.current_set_index].get_dot_positions()
-    
+
     def draw(self):
         self.set_of_dot_sets[self.current_set_index].draw()
 
