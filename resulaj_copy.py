@@ -19,14 +19,14 @@ GLOBAL VARIABLES @
 '''
 
 n_trials = 50
-n_dots = 250 # per set
+n_dots = 10 # per set
 n_sets = 3 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
-coherence = 1             #Proportion of dots to move together, range from 0 to 1
+coherence = .8             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 4          #How many pixels the dots move per frame
+move_distance = 2          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"

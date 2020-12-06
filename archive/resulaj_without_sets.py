@@ -1,9 +1,3 @@
-# LITERATURE VALUES:
-# diameter of aperture = 10-14 degrees
-# density = ~16.7 dots/(degree)^2/sec
-# frequency (1/(time between frames)) = 75 Hz
-# target = .8 deg diameter 10 deg from 
-
 #!/usr/bin/python3
 import sys
 import pygame
@@ -18,15 +12,23 @@ GLOBAL VARIABLES @
 @@@@@@@@@@@@@@@@@@
 '''
 
-n_trials = 50
-n_dots = 10 # per set
-n_sets = 3 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
+trial_choices = {"safe_choice": True, "continuing_evidence": False, "longer_stimulus": False, \
+    "limit_COM": False}
 
-coherence = .8             #Proportion of dots to move together, range from 0 to 1
+n_trials = 50                #number of trials
+
+n_dots = 250                #number of dots per set (equivalent to number of dots per
+                             #frame)
+n_sets = 3                  #number of sets to cycle through per frame
+                            #TO-DO: we can probably just delete this ^ parameter
+#coherent_direction = 0;   # OBSOLETE: The direction of the coherentDots in degrees
+                            #Starts at 3 o'clock and goes counterclockwise (0 ==
+                            #90 == upwards, 180 == leftwards, 270 == downwards), range 0 - 360
+coherence = 1             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 2          #How many pixels the dots move per frame
+move_distance = 4          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
@@ -73,6 +75,8 @@ change_mind_time = 3 # seconds that participant is given to change mind after in
 target_radius = 1.5 # in cm
 
 target_dist_from_start = 20 # in cm
+
+frames_per_second = 30
 
 
 '''
@@ -121,16 +125,6 @@ target_radius = int(target_radius * 37.8)
 FUNCTION DEFINITIONS @
 @@@@@@@@@@@@@@@@@@@@@@
 '''
-
-#calculates number of dots in the field based on the radius of aperture and dot density
-def find_ndots(visual_angle, density):
-    radius = angle_to_pixel_radius(visual_angle)
-    return np.rint(density*np.pi*radius*radius)
-
-#converts visual angle into aperture radius in pixels
-def angle_to_pixelRadius(visualangle, distanceFromScreen):
-    radius = np.tan((visualangle * 3.14 / 180)/2) * distanceFromScreen
-    return radius * 37.8
 
 #calculates coherent_jump_size_x based on global variables coherent_direction and
 #move_distance
@@ -203,7 +197,18 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
         coherent_direction = 180
 
     # create and group together all sprites
-    dot_sets = set_of_dot_sets(coherent_direction)
+    all_sprites = pygame.sprite.Group()
+    dot_array = []
+    for i in range(n_dots):
+        new_dot = dot(coherent_direction)
+
+        if i < n_coherent_dots:
+            new_dot.update_type = "coherent_direction_update"  #make it a coherent dot
+        else:
+            new_dot.update_type = "incoherent_direction_update"  #make it a random dot
+
+        all_sprites.add(new_dot)
+        dot_array.append(new_dot)
 
     # Game loop
     running = True
@@ -254,7 +259,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
 
         # collect dot and cursor positions if stimulus is off and experiment isn't over yet
         if (not waiting_period and not stimulus_on):
-            dot_positions[current_time] = dot_sets.get_dot_positions()
+            dot_positions[current_time] = get_dot_positions(dot_array)
             cursor_positions[current_time] = pygame.mouse.get_pos()
 
         # Update
@@ -268,8 +273,8 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
                 end_time = current_time
             
             if stimulus_on:
-                dot_sets.update()
-                dot_sets.draw()
+                all_sprites.update()
+                all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
                 display_countdown(int(experiment_done_time*1000 - current_time))
 
@@ -329,7 +334,18 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
         coherent_direction = 180
 
     # create and group together all sprites
-    dot_set = dot_set(coherent_direction)
+    all_sprites = pygame.sprite.Group()
+    dot_array = []
+    for i in range(n_dots):
+        new_dot = dot(coherent_direction)
+
+        if i < n_coherent_dots:
+            new_dot.update_type = "coherent_direction_update"  #make it a coherent dot
+        else:
+            new_dot.update_type = "incoherent_direction_update"  #make it a random dot
+
+        all_sprites.add(new_dot)
+        dot_array.append(new_dot)
 
     # Game loop
     running = True
@@ -380,7 +396,7 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
 
         # collect dot and cursor positions if stimulus is off and experiment isn't over yet
         if (not waiting_period and not stimulus_on):
-            dot_positions[current_time] = dot_set.get_dot_positions()
+            dot_positions[current_time] = get_dot_positions(dot_array)
             cursor_positions[current_time] = pygame.mouse.get_pos()
 
         # Update
@@ -396,8 +412,8 @@ def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_bet
                 end_time = current_time
             
             if stimulus_on:
-                dot_set.update()
-                dot_set.draw()
+                all_sprites.update()
+                all_sprites.draw(screen)
             elif (not stimulus_on and not waiting_period):
                 display_countdown(int(experiment_done_time*1000 - current_time))
 
@@ -752,60 +768,6 @@ class dot(pygame.sprite.Sprite):
 
             self.x = random_x_offset * horizontal_axis + aperture_center_x
             self.y = random_y_offset * vertical_axis + aperture_center_y
-
-class dot_set:
-    def __init__(self, coherent_direction):
-        self.set = []
-        self.sprite_group = pygame.sprite.Group()
-
-        n_coherent_dots = n_dots * coherence
-        n_incoherent_dots = n_dots - n_coherent_dots
-
-        for i in range(n_dots):
-            new_dot = dot(coherent_direction)
-
-            if i < n_coherent_dots:
-                new_dot.update_type = "coherent_direction_update"  #make it a coherent dot
-            else:
-                new_dot.update_type = "incoherent_direction_update"  #make it a random dot
-
-            self.set.append(new_dot)
-            self.sprite_group.add(new_dot)
-    
-    def update(self):
-        self.sprite_group.update()
-    
-    # returns an array of dot positions coordinates (x, y)
-    def get_dot_positions(self):
-        return get_dot_positions(self.set)
-
-    def draw(self):
-        self.sprite_group.draw(screen)
-
-class set_of_dot_sets:
-    def __init__(self, coherent_direction):
-        self.set_of_dot_sets = []
-
-        for i in range(n_sets):
-            new_dot_set = dot_set(coherent_direction)
-            self.set_of_dot_sets.append(new_dot_set)
-
-        self.current_set_index = 0
-
-    def update(self):
-        # cycle to the next set
-        self.current_set_index += 1
-        if (self.current_set_index >= len(self.set_of_dot_sets)):
-            self.current_set_index = 0
-        
-        self.set_of_dot_sets[self.current_set_index].update()
-    
-    def get_dot_positions(self):
-        return self.set_of_dot_sets[self.current_set_index].get_dot_positions()
-    
-    def draw(self):
-        self.set_of_dot_sets[self.current_set_index].draw()
-
 
 
 '''
