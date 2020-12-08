@@ -20,13 +20,13 @@ GLOBAL VARIABLES @
 
 n_trials = 50
 n_dots = 10 # per set
-n_sets = 3 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
+n_sets = 1 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
-coherence = .8             #Proportion of dots to move together, range from 0 to 1
+coherence = .5             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 2          #How many pixels the dots move per frame
+move_distance = 15          #How many pixels the dots move per frame
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
@@ -115,6 +115,8 @@ cwd = os.getcwd()
 
 target_radius = int(target_radius * 37.8)
 
+cursor_start_position = [0.5*monitor.current_w, .9*monitor.current_h]
+
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@
@@ -187,12 +189,11 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
     filename = "resulaj_control.csv"
 
     # set the initial cursor position
-    initial_cursor_position = [0.5*monitor.current_w, .9*monitor.current_h]
-    pygame.mouse.set_pos(initial_cursor_position)
+    pygame.mouse.set_pos(cursor_start_position)
     pygame.mouse.get_rel()
 
     # get target parameters
-    left_target_coords, right_target_coords = get_target_positions(initial_cursor_position[1])
+    left_target_coords, right_target_coords = get_target_positions(cursor_start_position[1])
 
     #calculate the number of coherent and incoherent dots
     n_coherent_dots = n_dots * coherence
@@ -520,6 +521,26 @@ def draw_targets(left_target_coords, right_target_coords):
     else:
         pygame.draw.circle(screen, initial_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
         pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
+        return 0
+
+#check if cursor in start circle, return 1 if so and zero else
+def check_cursor_in_start(start_coords):
+    x, y = pygame.mouse.get_pos()
+
+    # check if it's in start
+    x_dist_from_start = np.abs(x - start_coords[0])
+    y_dist_from_start = np.abs(y - start_coords[1])
+    if ((x_dist_from_start**2 + y_dist_from_start**2)**0.5 <= start_radius):
+        return 1
+    return 0
+
+def draw_start(start_coords):
+    start_selected= check_cursor_in_start(start_coords)
+    if (start_selected==1):
+        pygame.draw.circle(screen, selected_start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
+        return 1
+    else :
+        pygame.draw.circle(screen, start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
         return 0
 
 '''
