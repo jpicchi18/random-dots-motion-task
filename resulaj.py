@@ -19,14 +19,14 @@ GLOBAL VARIABLES @
 '''
 
 n_trials = 50
-n_dots = 10 # per set
-n_sets = 1 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
+dot_density = 16.7      # measured in dots/(degree^2 * sec)
+n_sets = 3 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
 coherence = .5             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
-dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
+dot_life = 20               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
-move_distance = 15          #How many pixels the dots move per frame
+dot_speed = 7.1     # in visual degrees per second
 noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
@@ -41,7 +41,7 @@ safe choice score values = [none, correct, wrong, safe]
 safe_choice_time_bounds = [min, max], where the time is selected randomly within that range
 '''
 safe_choice_scores = [-2, 1, -1, 0]
-time_bounds = [5, 8]
+trial_time = [20, 20]     # time length of a trial, where time is chosen randomly and uniformly between these these bounds
 
 '''
 Out of Bounds Decision
@@ -59,8 +59,10 @@ Shape of aperture
  4 - Rectangle
 '''
 aperture_type = 1
+dist_of_eye_to_screen_cm = 43   # distance from the human eye to the stimulus, measured in in cm
+aperture_radius = 7    # aperture radius in visual angles
 
-frames_per_second = 30
+frames_per_second = 75
 
 directory_name = ""
 
@@ -99,14 +101,10 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
 dot_color = WHITE         #Color of the dots
-background_color = GRAY   #Color of the background
+background_color = BLACK   #Color of the background
 initial_target_color = BLACK
 selected_target_color = BLUE
-aperture_width = monitor.current_w/5;       #How many pixels wide the aperture is. For square aperture this
-                            #will be the both height and width. For circle, this will be
-                            #the diameter.
-aperture_height = monitor.current_h/4;      #How many pixels high the aperture is. Only relevant for ellipse
-                            #and rectangle apertures. For circle and square, this is ignored.
+
 aperture_center_x = x_screen_center      #NOTE: Aperture center is currently equal to center of
                                          #screen
 aperture_center_y = y_screen_center      # (in pixels)
@@ -147,7 +145,7 @@ def calculate_coherent_jump_size_y(coherent_direction):
     return move_distance * np.sin(angle_in_radians)
 
 # initialize the parameters for the aperture for further calculation
-def init_aperture_param():
+def init_aperture_param(aperture_width, aperture_height):
     # For circle and square
     if (aperture_type == 1 or aperture_type == 3):
         horizontal_axis = vertical_axis = aperture_width / 2
@@ -175,7 +173,7 @@ def get_dot_positions(dot_array):
     return dot_positions
 
 # normal resulaj implementation
-def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_between_trials):
+def resulaj_test(coherence, is_right, trial_num, time_between_trials):
     clock = pygame.time.Clock()
     trial_dict = {} # where we will record all data for this trial, including the following...
     dot_positions = {}
@@ -183,10 +181,11 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
     waiting_period = False
     stimulus_on = True
     target_selected = 0
+    time_limit = np.random.uniform(trial_time[0], trial_time[1])
     trial_done_time = time_limit + target_persistence_time + time_between_trials # when to leave the function
     experiment_done_time = time_limit + target_persistence_time # when to turn off stimulus and targets
     end_time = 0
-    filename = "resulaj_control.csv"
+    filename = "resulaj.csv"
 
     # set the initial cursor position
     pygame.mouse.set_pos(cursor_start_position)
@@ -223,12 +222,12 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # check if user clicked the red x
                 pygame.quit()
-                print("early program termination", file = sys.stderr)
+                print("user-initiated program termination", file = sys.stderr)
                 exit(1)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.quit()
-                    print("early program termination", file = sys.stderr)
+                    print("user-initiated program termination", file = sys.stderr)
                     exit(1)
                 elif event.key == pygame.K_n:
                     experiment_done_time = current_time/1000
@@ -272,7 +271,7 @@ def resulaj_test_control(coherence, is_right, trial_num, time_limit, time_betwee
                 dot_sets.update()
                 dot_sets.draw()
             elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time*1000 - current_time))
+                display_countdown(int(experiment_done_time - current_time/1000))
 
          # *after* drawing everything, flip the display
         pygame.display.update()
@@ -460,9 +459,8 @@ def initialize_experiment():
 
 def run_resulaj_test():
     for i in range(n_trials):
-        resulaj_test_control(np.random.choice(coherence_choices), \
+        resulaj_test(np.random.choice(coherence_choices), \
             np.random.choice([0,1]), i, \
-                np.random.uniform(time_bounds[0], time_bounds[1]), \
                     np.random.uniform(time_between_trials[0], time_between_trials[1]))
 
     # for i in range(n_trials):
@@ -543,20 +541,38 @@ def draw_start(start_coords):
         pygame.draw.circle(screen, start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
         return 0
 
+def visual_degrees_to_pixels(visual_degrees):
+    return int(dist_of_eye_to_screen_cm * np.tan(visual_degrees * np.pi/180) * 37.795)
+
+def angles_per_second_to_pixels_per_second(dot_speed):
+    return dot_speed * (n_sets/frames_per_second) * (visual_degrees_to_pixels(dot_speed)/dot_speed)
+
+# only works for circular apertures!!
+def density_to_ndots(density, aperture_width_in_pixels):
+   new_density = density * (1/(visual_degrees_to_pixels(1)**2))
+   total_n_dots = new_density * (np.pi * (aperture_width_in_pixels/2)**2)
+   dots_per_frame = total_n_dots/frames_per_second
+   return int(dots_per_frame)
+
 '''
 @@@@@@@@@@@@@@@@@@@@@@@
 MORE GLOBAL VARIABLES @
 @@@@@@@@@@@@@@@@@@@@@@@
 '''
 
-#TO-DO: update this based on pygame
+# aperture_height gets ignored if circular aperture shape is selected
+aperture_width = aperture_height = 2*visual_degrees_to_pixels(aperture_radius)
+
 #initialize aperture parameters --> horizontal = vertical because we are using a circle
-aperture_axis = init_aperture_param()
+aperture_axis = init_aperture_param(aperture_width, aperture_height)
 horizontal_axis = aperture_axis[0]
 vertical_axis = aperture_axis[1]
 #  Was going to use to update portion of screen but dont see an increase in performance/ decrease in time
 # aperture_section = pygame.Rect((aperture_center_x - horizontal_axis, aperture_center_y - vertical_axis),(aperture_width,aperture_height))
 
+move_distance = angles_per_second_to_pixels_per_second(dot_speed)   # How many pixels the dots move per frame
+
+n_dots = density_to_ndots(dot_density, aperture_width)      # number of dots per set
 
 '''
 @@@@@@@@@@@@@@@@@@@
@@ -825,8 +841,8 @@ class set_of_dot_sets:
         return self.set_of_dot_sets[self.current_set_index].get_dot_positions()
     
     def draw(self):
+        # draw all dot sets
         self.set_of_dot_sets[self.current_set_index].draw()
-
 
 
 '''
