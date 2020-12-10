@@ -22,15 +22,16 @@ n_trials = 50
 dot_density = 16.7      # measured in dots/(degree^2 * sec)
 n_sets = 3 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
-coherence = .5             #Proportion of dots to move together, range from 0 to 1
+coherence = .1             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
 dot_life = 20               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
 dot_speed = 7.1     # in visual degrees per second
-noise_update_type = "incoherent_direction_update"   #how to update noise dots --> options:
+noise_update_type = "reset_location"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
                                                     # "reset_location"
+dot_labels_fixed = False                                
 
 coherence_choices = [0, .016, .032, .064, .128, .256]
 time_between_trials = [0.7, 1.0] # time bounds, in seconds
@@ -725,7 +726,7 @@ class dot(pygame.sprite.Sprite):
         elif self.update_type == "incoherent_direction_update":
             self.incoherent_direction_update()
         elif self.update_type == "reset_location":
-            self.reset_location
+            self.reset_location()
         else:
             print("error: update_type is invalid")
             exit(1);
@@ -804,12 +805,21 @@ class dot_set:
             if i < n_coherent_dots:
                 new_dot.update_type = "coherent_direction_update"  #make it a coherent dot
             else:
-                new_dot.update_type = "incoherent_direction_update"  #make it a random dot
+                new_dot.update_type = noise_update_type  #make it a random dot
 
             self.set.append(new_dot)
             self.sprite_group.add(new_dot)
     
     def update(self):
+        # change the noise/coherent designation if labels are not fixed
+        if not dot_labels_fixed:
+            for dot in self.set:
+                if (np.random.uniform() <= coherence):
+                    dot.update_type = "coherent_direction_update"
+                else:
+                    dot.update_type = noise_update_type
+
+        # update dot locations
         self.sprite_group.update()
     
     # returns an array of dot positions coordinates (x, y)
