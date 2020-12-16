@@ -102,7 +102,7 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
 dot_color = WHITE         #Color of the dots
-background_color = BLACK   #Color of the background
+background_color = GRAY   #Color of the background
 initial_target_color = BLACK
 selected_target_color = BLUE
 
