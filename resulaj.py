@@ -22,9 +22,8 @@ n_trials = 50
 dot_density = 16.7      # measured in dots/(degree^2 * sec)
 n_sets = 1 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
-coherence = .2             #Proportion of dots to move together, range from 0 to 1
 dot_radius = 2             #Radius of each dot in pixels
-dot_life = 20               # How many frames a dot follows its trajectory before redrawn. -1
+dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
 dot_speed = 7.1     # in visual degrees per second
 noise_update_type = "reset_location"   #how to update noise dots --> options:
@@ -33,7 +32,7 @@ noise_update_type = "reset_location"   #how to update noise dots --> options:
                                                     # "reset_location"
 dot_labels_fixed = False                                
 
-coherence_choices = [0, .016, .032, .064, .128, .256]
+coherence_choices = [.5, 1] #[0, .016, .032, .064, .128, .256]
 time_between_trials = [0.7, 1.0] # time bounds, in seconds
 time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
 
@@ -116,6 +115,10 @@ target_radius = int(target_radius * 37.8)
 
 cursor_start_position = [0.5*monitor.current_w, .9*monitor.current_h]
 
+start_color = BLUE
+start_radius = 1
+selected_start_color = BLUE
+
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@
@@ -165,382 +168,28 @@ def draw_text(surface, text, size, x, y, color):
     text_rect.midtop = (x, y)
     surface.blit(text_surface, text_rect)
 
-# add a row to the 2d matrix "position_record", which records the positions of dots at a given point
-# in time
-def get_dot_positions(dot_array):
-    dot_positions = []
-    for dot in dot_array:
-        dot_positions.append([dot.x, dot.y])
-    return dot_positions
-
-# normal resulaj implementation
-def resulaj_test(coherence, is_right, trial_num, time_between_trials):
-    clock = pygame.time.Clock()
-    trial_dict = {} # where we will record all data for this trial, including the following...
-    dot_positions = {}
-    cursor_positions = {}
-    waiting_period = False
-    stimulus_on = True
-    target_selected = 0
-    time_limit = np.random.uniform(trial_time[0], trial_time[1])
-    trial_done_time = time_limit + target_persistence_time + time_between_trials # when to leave the function
-    experiment_done_time = time_limit + target_persistence_time # when to turn off stimulus and targets
-    end_time = 0
-    filename = "resulaj.csv"
-
-    # set the initial cursor position
-    pygame.mouse.set_pos(cursor_start_position)
-    pygame.mouse.get_rel()
-
-    # get target parameters
-    left_target_coords, right_target_coords = get_target_positions(cursor_start_position[1])
-
-    #calculate the number of coherent and incoherent dots
-    n_coherent_dots = n_dots * coherence
-    n_incoherent_dots = n_dots - n_coherent_dots
-
-    coherent_direction = 0
-    if not is_right:
-        coherent_direction = 180
-
-    # create and group together all sprites
-    dot_sets = set_of_dot_sets(coherent_direction)
-
-    # Game loop
-    running = True
-    start_time = pygame.time.get_ticks() # in milliseconds
-    while running:
-
-        # keep apropriate loop speed
-        clock.tick(frames_per_second)
-
-        # get current time
-        current_time = pygame.time.get_ticks()-start_time
-
-        # check if user closed the window or pressed the "esc" key --> if so, exit the program
-        # if user pressed the "n" key --> jump to the wait period before the next trial
-        pressed = pygame.key.get_pressed()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: # check if user clicked the red x
-                pygame.quit()
-                print("user-initiated program termination", file = sys.stderr)
-                exit(1)
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    print("user-initiated program termination", file = sys.stderr)
-                    exit(1)
-                elif event.key == pygame.K_n:
-                    experiment_done_time = current_time/1000
-
-        # end the trial if we've passed the post-trial break
-        if (current_time > trial_done_time*1000):
-            running = False
-            break
-
-        # enter the post-trial break if it's time to do so
-        if (current_time > experiment_done_time * 1000 and not waiting_period):
-            waiting_period = True
-            trial_done_time = current_time/1000 + time_between_trials
-        
-        # turn off stimulus (not targets) if it's time to do so
-        if (current_time > time_limit*1000):
-            stimulus_on = False
-
-        # turn off stimulus if cursor moved
-        if (pygame.mouse.get_rel() != (0,0)):
-            if (stimulus_on):
-                experiment_done_time = current_time/1000 + target_persistence_time
-                stimulus_on = False
-
-        # collect dot and cursor positions if stimulus is off and experiment isn't over yet
-        if (not waiting_period and not stimulus_on):
-            dot_positions[current_time] = dot_sets.get_dot_positions()
-            cursor_positions[current_time] = pygame.mouse.get_pos()
-
-        # Update
-        screen.fill(background_color)
-        if (not waiting_period):
-            target_selected = draw_targets(left_target_coords, right_target_coords)
-            if (target_selected):
-                waiting_period = True
-                stimulus_on = False
-                trial_done_time = current_time/1000 + time_between_trials
-                end_time = current_time
-            
-            if stimulus_on:
-                dot_sets.update()
-                dot_sets.draw()
-            elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time - current_time/1000))
-
-         # *after* drawing everything, flip the display
-        pygame.display.update()
-
-    trial_str = "Trial " + str(trial_num)
-    trial_dict[trial_str] = ""
-
-    trial_dict['coherence'] = str(coherence) # float val of coherence messed up pandas
-    trial_dict['dot_positions'] = dot_positions
-    trial_dict['cursor_positions'] = cursor_positions
-    trial_dict['end_time'] = end_time
-    trial_dict['target_selected'] = target_selected
-    trial_dict['is_right'] = is_right
-    
-    if (target_selected == is_right+1):
-        trial_dict['is_correct'] = 1
-    else:
-        trial_dict['is_correct'] = 0
-
-    export_csv(trial_dict, filename)
-
-    # split data for different trials into different csv files?
-
-    return 0
-
-# participant has time after first target selection to change his/her mind
-def resulaj_test_experiment(coherence, is_right, trial_num, time_limit, time_between_trials):
-    clock = pygame.time.Clock()
-    trial_dict = {} # where we will record all data for this trial, including the following...
-    dot_positions = {}
-    cursor_positions = {}
-    waiting_period = False
-    stimulus_on = True
-    first_selection = True
-    target_selected = 0
-    trial_done_time = time_limit + target_persistence_time + time_between_trials # when to leave the function
-    experiment_done_time = time_limit + target_persistence_time # when to turn off stimulus and targets
-    end_time = 0
-    filename = "resulaj_experiment.csv"
-
-    # set the initial cursor position
-    initial_cursor_position = [0.5*monitor.current_w, .9*monitor.current_h]
-    pygame.mouse.set_pos(initial_cursor_position)
-    pygame.mouse.get_rel()
-
-    # get target parameters
-    left_target_coords, right_target_coords = get_target_positions(initial_cursor_position[1])
-
-    #calculate the number of coherent and incoherent dots
-    n_coherent_dots = n_dots * coherence
-    n_incoherent_dots = n_dots - n_coherent_dots
-
-    coherent_direction = 0
-    if not is_right:
-        coherent_direction = 180
-
-    # create and group together all sprites
-    dot_set = dot_set(coherent_direction)
-
-    # Game loop
-    running = True
-    start_time = pygame.time.get_ticks() # in milliseconds
-    while running:
-
-        # keep apropriate loop speed
-        clock.tick(frames_per_second)
-
-        # get current time
-        current_time = pygame.time.get_ticks()-start_time
-
-        # check if user closed the window or pressed the "esc" key --> if so, exit the program
-        # if user pressed the "n" key --> jump to the wait period before the next trial
-        pressed = pygame.key.get_pressed()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: # check if user clicked the red x
-                pygame.quit()
-                print("early program termination", file = sys.stderr)
-                exit(1)
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    print("early program termination", file = sys.stderr)
-                    exit(1)
-                elif event.key == pygame.K_n:
-                    experiment_done_time = current_time/1000
-
-        # end the trial if we've passed the post-trial break
-        if (current_time > trial_done_time*1000):
-            running = False
-            break
-
-        # enter the post-trial break if it's time to do so
-        if (current_time > experiment_done_time * 1000 and not waiting_period):
-            waiting_period = True
-            trial_done_time = current_time/1000 + time_between_trials
-        
-        # turn off stimulus (not targets) if it's time to do so
-        if (current_time > time_limit*1000):
-            stimulus_on = False
-
-        # turn off stimulus if cursor moved
-        if (pygame.mouse.get_rel() != (0,0)):
-            if (stimulus_on):
-                experiment_done_time = current_time/1000 + target_persistence_time
-                stimulus_on = False
-
-        # collect dot and cursor positions if stimulus is off and experiment isn't over yet
-        if (not waiting_period and not stimulus_on):
-            dot_positions[current_time] = dot_set.get_dot_positions()
-            cursor_positions[current_time] = pygame.mouse.get_pos()
-
-        # Update
-        screen.fill(background_color)
-        if (not waiting_period):
-            target_selected = draw_targets(left_target_coords, right_target_coords)
-            if (target_selected):
-                stimulus_on = False
-                if (first_selection):
-                    trial_done_time = current_time/1000 + change_mind_time + time_between_trials
-                    experiment_done_time = current_time/1000 + change_mind_time
-                    first_selection = False
-                end_time = current_time
-            
-            if stimulus_on:
-                dot_set.update()
-                dot_set.draw()
-            elif (not stimulus_on and not waiting_period):
-                display_countdown(int(experiment_done_time*1000 - current_time))
-
-         # *after* drawing everything, flip the display
-        pygame.display.update()
-
-    trial_str = "Trial " + str(trial_num)
-    trial_dict[trial_str] = ""
-
-    trial_dict['coherence'] = str(coherence) # float val of coherence messed up pandas
-    trial_dict['dot_positions'] = dot_positions
-    trial_dict['cursor_positions'] = cursor_positions
-    trial_dict['end_time'] = end_time
-    trial_dict['target_selected'] = target_selected
-    trial_dict['is_right'] = is_right
-    
-    if (target_selected == is_right+1):
-        trial_dict['is_correct'] = 1
-    else:
-        trial_dict['is_correct'] = 0
-
-    export_csv(trial_dict, filename)
-
-    # split data for different trials into different csv files?
-
-    return 0
-
-def display_countdown(msec_remaining):
-    msec_remaining = int(np.ceil(msec_remaining / 100) * 100)
-    draw_text(screen, str(msec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
-
-def export_csv(result_dict, filename):
-    
-    # Can adjust later to a customized file name
-    if os.path.exists(directory_name + filename):
-        with open(directory_name + filename, 'a') as f:
-            w = csv.writer(f)
-            w.writerows(result_dict.items())
-    else:
-        with open(directory_name + filename, 'w') as f:
-            w = csv.writer(f)
-            w.writerows(result_dict.items())
-
-def make_data_dir():
-    experiment_num = 0
-    global directory_name
-    
-    # create parent "data" directory, if needed
-    if not os.path.exists(cwd + "/data"):
-        os.mkdir(cwd + "/data")
-
-    while os.path.exists(cwd + "/data/experiment_" + str(experiment_num)):
-        experiment_num += 1
-    directory_name = cwd + "/data/experiment_" + str(experiment_num) + "/"
-    os.mkdir(directory_name)
-
-def initialize_experiment():
-    make_data_dir()
-
-def run_resulaj_test():
-    for i in range(n_trials):
-        resulaj_test(np.random.choice(coherence_choices), \
-            np.random.choice([0,1]), i, \
-                    np.random.uniform(time_between_trials[0], time_between_trials[1]))
-
-    # for i in range(n_trials):
-    #     safe_choice_score = resulaj_test_experiment(np.random.choice(coherence_choices), \
-    #         np.random.choice([0,1]), i, score, \
-    #             np.random.uniform(time_bounds[0], time_bounds[1]))
-
-# calculate positions for the left and right targets
-# return 2 lists, first one containing the left coordinates, second one with the right coordinates
-def get_target_positions(cursor_start_position):
-    # calculate target distance --> 20 cm from start position
-    target_dist = target_dist_from_start * 38.7
-    
-    # calculate y vals
-    height = target_dist*np.cos((np.pi/180) * target_angle)
-    y_coord = cursor_start_position - height
-    
-    # calculate x vals
-    x_offset = target_dist*np.sin((np.pi/180) * target_angle)
-    left_x = 0.5 * monitor.current_w - x_offset
-    right_x = 0.5 * monitor.current_w + x_offset
-
-    return [int(left_x), int(y_coord)], [int(right_x), int(y_coord)]
-
-# return 1 for cursor in left target, 2 for cursor in right target, 0 otherwise
-def check_cursor_in_target(left_target_coords, right_target_coords):
-    x, y = pygame.mouse.get_pos()
-
-    # check if it's in left target
-    x_dist_from_left = np.abs(x - left_target_coords[0])
-    y_dist_from_left = np.abs(y - left_target_coords[1])
-    if ((x_dist_from_left**2 + y_dist_from_left**2)**0.5 <= target_radius):
-        return 1
-
-    # check if it's in right target
-    x_dist_from_right = np.abs(x - right_target_coords[0])
-    y_dist_from_right = np.abs(y - right_target_coords[1])
-    if ((x_dist_from_right**2 + y_dist_from_right**2)**0.5 <= target_radius):
-        return 2
-
-    return 0
-
-# draw targets for resulaj experiment, returning 1 if a left target is selected, 2 for right target,
-# 0 if none selected
-def draw_targets(left_target_coords, right_target_coords):
-    target_selected = check_cursor_in_target(left_target_coords, right_target_coords)
-    
-    if (target_selected == 1):
-        pygame.draw.circle(screen, selected_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
-        pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
-        return 1
-    elif (target_selected == 2):
-        pygame.draw.circle(screen, initial_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
-        pygame.draw.circle(screen, selected_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
-        return 2
-    else:
-        pygame.draw.circle(screen, initial_target_color, (left_target_coords[0], left_target_coords[1]), target_radius, 6)
-        pygame.draw.circle(screen, initial_target_color, (right_target_coords[0], right_target_coords[1]), target_radius, 6)
-        return 0
-
 #check if cursor in start circle, return 1 if so and zero else
-def check_cursor_in_start(start_coords):
+def check_cursor_in_start():
     x, y = pygame.mouse.get_pos()
 
     # check if it's in start
-    x_dist_from_start = np.abs(x - start_coords[0])
-    y_dist_from_start = np.abs(y - start_coords[1])
-    if ((x_dist_from_start**2 + y_dist_from_start**2)**0.5 <= start_radius):
+    x_dist_from_start = np.abs(x - cursor_start_position[0])
+    y_dist_from_start = np.abs(y - cursor_start_position[1])
+    if ((x_dist_from_start**2 + y_dist_from_start**2)**0.5 <= start_radius*37.8):
         return 1
     return 0
 
-def draw_start(start_coords):
-    start_selected= check_cursor_in_start(start_coords)
+def draw_start():
+    screen.fill(background_color)
+    start_selected = check_cursor_in_start()
     if (start_selected==1):
-        pygame.draw.circle(screen, selected_start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
+        pygame.draw.circle(screen, selected_start_color, (cursor_start_position[0], cursor_start_position[1]), start_radius*37.8, 6)
         return 1
     else :
-        pygame.draw.circle(screen, start_color, (start_coords[0], start_coords[1]), start_radius*37.8, 6)
+        pygame.draw.circle(screen, start_color, (cursor_start_position[0], cursor_start_position[1]), start_radius*37.8, 6)
         return 0
+
+    pygame.display.update()
 
 def visual_degrees_to_pixels(visual_degrees):
     return int(dist_of_eye_to_screen_cm * np.tan(visual_degrees * np.pi/180) * 37.795)
@@ -555,6 +204,10 @@ def density_to_ndots(density, aperture_width_in_pixels):
    dots_per_frame = total_n_dots/frames_per_second
    return int(dots_per_frame)
 
+def fill_background():
+    screen.fill(background_color)
+    draw_start()
+    pygame.display.update()
 '''
 @@@@@@@@@@@@@@@@@@@@@@@
 MORE GLOBAL VARIABLES @
@@ -592,7 +245,7 @@ class dot(pygame.sprite.Sprite):
         self.vy2 = 0                                    #incoherent y jumpsize
         self.latest_x_move = 0                          #latest x move direction
         self.latest_y_move = 0                          #latest y move direction
-        self.life_count = np.floor(np.random.uniform(0, dot_life))    #counter for dot's life
+        self.life_count = np.floor(np.random.randint(0, dot_life))    #counter for dot's life
         self.update_type = ""                           #string to determine how dot gets updated
 
         # create random x and y coordinates
@@ -605,21 +258,19 @@ class dot(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, dot_color, (dot_radius, dot_radius), dot_radius)
         self.rect = self.image.get_rect(center=(self.x, self.y)) # Rect determines position the dot is drawn
 
-    #Function to check if dot life has ended
-    def life_ended(self):
-
+    # decrement life count, and reset location if dot life ended
+    def life_check(self):
+        
+        self.life_count -= 1
+        
         #If we want infinite dot life
         if (dot_life < 0):
-            self.life_count = 0; #resetting to zero to save memory. Otherwise it might
-                                 #increment to huge numbers.
-            return False
+            self.life_count = 0; #resetting to zero to save memory. Otherwise it might increment to huge numbers.
+        
         # Else if the dot's life has reached its end
-        elif (self.life_count >= dot_life):
-            self.life_count = 0
-            return True
-        #Else the dot's life has not reached its end
-        else:
-            return False
+        elif (self.life_count < 0):
+            self.life_count = dot_life
+            self.reset_location()
 
     # Function to check if dot is out of bounds
     def out_of_bounds(self):
@@ -731,14 +382,11 @@ class dot(pygame.sprite.Sprite):
             print("error: update_type is invalid")
             exit(1);
 
-        self.life_count += 1
-
         #TO-DO: check if dot goes out of bounds or if life ended, and update accordingly
         #TO-DO: if life ended, give it new random x and y directions, and update
         #vx, vy, vx2, vy2 if necessary
 
-        if (self.life_ended()):
-            dot = self.reset_location()
+        self.life_check()
 
     	# If it goes out of bounds, do what is necessary (reinsert randomly or reinsert on the opposite edge) based on the parameter chosen
         if (self.out_of_bounds()):
@@ -792,9 +440,10 @@ class dot(pygame.sprite.Sprite):
             self.y = random_y_offset * vertical_axis + aperture_center_y
 
 class dot_set:
-    def __init__(self, coherent_direction):
+    def __init__(self, coherence, coherent_direction):
         self.set = []
         self.sprite_group = pygame.sprite.Group()
+        self.coherence = coherence
 
         n_coherent_dots = n_dots * coherence
         n_incoherent_dots = n_dots - n_coherent_dots
@@ -814,7 +463,7 @@ class dot_set:
         # change the noise/coherent designation if labels are not fixed
         if not dot_labels_fixed:
             for dot in self.set:
-                if (np.random.uniform() <= coherence):
+                if (np.random.uniform() <= self.coherence):
                     dot.update_type = "coherent_direction_update"
                 else:
                     dot.update_type = noise_update_type
@@ -824,17 +473,21 @@ class dot_set:
     
     # returns an array of dot positions coordinates (x, y)
     def get_dot_positions(self):
-        return get_dot_positions(self.set)
+        dot_positions = []
+        for dot in self.set:
+            dot_positions.append((dot.x, dot.y))
+        
+        return dot_positions
 
     def draw(self):
         self.sprite_group.draw(screen)
 
 class set_of_dot_sets:
-    def __init__(self, coherent_direction):
+    def __init__(self, coherence, coherent_direction):
         self.set_of_dot_sets = []
 
         for i in range(n_sets):
-            new_dot_set = dot_set(coherent_direction)
+            new_dot_set = dot_set(coherence, coherent_direction)
             self.set_of_dot_sets.append(new_dot_set)
 
         self.current_set_index = 0
@@ -854,7 +507,227 @@ class set_of_dot_sets:
         # draw all dot sets
         self.set_of_dot_sets[self.current_set_index].draw()
 
+class resulaj:
+    def __init__(self):
+        self.make_data_dir()
+        self.clock = pygame.time.Clock()
+        self.left_target_coords, self.right_target_coords = self.get_target_positions()
 
+    def make_data_dir(self):
+        experiment_num = 0
+        global directory_name
+        
+        # create parent "data" directory, if needed
+        if not os.path.exists(cwd + "/data"):
+            os.mkdir(cwd + "/data")
+
+        while os.path.exists(cwd + "/data/experiment_" + str(experiment_num)):
+            experiment_num += 1
+        directory_name = cwd + "/data/experiment_" + str(experiment_num) + "/"
+        os.mkdir(directory_name)
+
+    # run however many resulaj_trials we want
+    def run(self):
+        for i in range(n_trials):
+            self.resulaj_trial(i)
+    
+    def resulaj_trial(self, trial_num):
+        #define relevant variables
+        coherence = np.random.choice(coherence_choices)
+        is_right = np.random.choice([0,1])
+        time_btw_trials = np.random.uniform(time_between_trials[0], time_between_trials[1])
+        time_limit = np.random.uniform(trial_time[0], trial_time[1])
+
+        trial_dict = {} # where we will record all data for this trial, including the following...
+        dot_positions = {}
+        cursor_positions = {}
+        waiting_period = False
+        stimulus_on = True
+        target_selected = 0
+        trial_done_time = time_limit + target_persistence_time + time_btw_trials # when to leave the function
+        experiment_done_time = time_limit + target_persistence_time # when to turn off stimulus and targets
+        end_time = 0
+        filename = "resulaj.csv"
+
+        # set the initial cursor position
+        pygame.mouse.set_pos(cursor_start_position)
+        pygame.mouse.get_rel()
+
+        # decide on the coherent direction
+        coherent_direction = 0
+        if not is_right:
+            coherent_direction = 180
+
+        # create and group together all sprites
+        dot_sets = set_of_dot_sets(coherence, coherent_direction)
+
+        # Game loop
+        running = True
+        start_time = pygame.time.get_ticks() # in milliseconds
+        while running:
+
+            # keep apropriate loop speed
+            self.clock.tick(frames_per_second)
+
+            # get current time
+            current_time = pygame.time.get_ticks()-start_time
+
+            self.check_early_termination()
+
+            # end the trial if we've passed the post-trial break
+            if (current_time > trial_done_time*1000):
+                running = False
+                break
+
+            # enter the post-trial break if it's time to do so
+            if (current_time > experiment_done_time * 1000 and not waiting_period):
+                waiting_period = True
+                trial_done_time = current_time/1000 + time_btw_trials
+            
+            # turn off stimulus (not targets) if it's time to do so
+            if (current_time > time_limit*1000):
+                stimulus_on = False
+
+            # turn off stimulus if cursor moved
+            if (pygame.mouse.get_rel() != (0,0)):
+                if (stimulus_on):
+                    experiment_done_time = current_time/1000 + target_persistence_time
+                    stimulus_on = False
+
+            # collect dot and cursor positions if stimulus is off and experiment isn't over yet
+            if (not waiting_period and not stimulus_on):
+                dot_positions[current_time] = dot_sets.get_dot_positions()
+                cursor_positions[current_time] = pygame.mouse.get_pos()
+
+            # Update
+            screen.fill(background_color)
+            if (not waiting_period):
+                target_selected = self.draw_targets()
+                if (target_selected):
+                    waiting_period = True
+                    stimulus_on = False
+                    trial_done_time = current_time/1000 + time_btw_trials
+                    end_time = current_time
+                
+                if stimulus_on:
+                    dot_sets.update()
+                    dot_sets.draw()
+                elif (not stimulus_on and not waiting_period):
+                    self.display_countdown(int(experiment_done_time - current_time/1000))
+
+            # *after* drawing everything, flip the display
+            pygame.display.update()
+
+        trial_str = "Trial " + str(trial_num)
+        trial_dict[trial_str] = ""
+
+        trial_dict['coherence'] = str(coherence) # float val of coherence messed up pandas
+        trial_dict['dot_positions'] = dot_positions
+        trial_dict['cursor_positions'] = cursor_positions
+        trial_dict['end_time'] = end_time
+        trial_dict['target_selected'] = target_selected
+        trial_dict['is_right'] = is_right
+        
+        if (target_selected == is_right+1):
+            trial_dict['is_correct'] = 1
+        else:
+            trial_dict['is_correct'] = 0
+
+        self.export_csv(trial_dict, filename)
+
+        # split data for different trials into different csv files?
+
+        return 0
+
+    # exit the program if user closed the window or pressed the "esc" key
+    def check_early_termination(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: # check if user clicked the red x
+                pygame.quit()
+                print("user-initiated program termination", file = sys.stderr)
+                exit(1)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    print("user-initiated program termination", file = sys.stderr)
+                    exit(1)
+
+    # calculate positions for the left and right targets
+    # return 2 lists, first one containing the left coordinates, second one with the right coordinates
+    def get_target_positions(self):
+        # calculate target distance --> 20 cm from start position
+        target_dist = target_dist_from_start * 38.7
+    
+        # calculate y vals
+        height = target_dist*np.cos((np.pi/180) * target_angle)
+        y_coord = cursor_start_position[1] - height
+    
+        # calculate x vals
+        x_offset = target_dist*np.sin((np.pi/180) * target_angle)
+        left_x = 0.5 * monitor.current_w - x_offset
+        right_x = 0.5 * monitor.current_w + x_offset
+
+        return [int(left_x), int(y_coord)], [int(right_x), int(y_coord)]
+
+    # draw targets for resulaj experiment, returning 1 if a left target is selected, 2 for right target, 0 if none selected
+    def draw_targets(self):
+        target_selected = self.check_cursor_in_target()
+        
+        # choose colors for left and right targets
+        left_color = initial_target_color
+        right_color = initial_target_color
+        if (target_selected == 1):
+            left_color = selected_target_color
+        elif (target_selected == 2):
+            right_color = selected_target_color
+        
+        # draw targets:
+        pygame.draw.circle(screen, left_color, (self.left_target_coords[0], self.left_target_coords[1]), \
+            target_radius, 6)
+        pygame.draw.circle(screen, right_color, (self.right_target_coords[0], self.right_target_coords[1]), \
+            target_radius, 6)
+        
+        # return values:
+        if (target_selected == 1):
+            return 1
+        elif (target_selected == 2):
+            return 2
+        else:
+            return 0
+
+    # return 1 for cursor in left target, 2 for cursor in right target, 0 otherwise
+    def check_cursor_in_target(self):
+        x, y = pygame.mouse.get_pos()
+
+        # check if it's in left target
+        x_dist_from_left = np.abs(x - self.left_target_coords[0])
+        y_dist_from_left = np.abs(y - self.left_target_coords[1])
+        if ((x_dist_from_left**2 + y_dist_from_left**2)**0.5 <= target_radius):
+            return 1
+
+        # check if it's in right target
+        x_dist_from_right = np.abs(x - self.right_target_coords[0])
+        y_dist_from_right = np.abs(y - self.right_target_coords[1])
+        if ((x_dist_from_right**2 + y_dist_from_right**2)**0.5 <= target_radius):
+            return 2
+
+        return 0
+
+    def display_countdown(self, msec_remaining):
+        msec_remaining = int(np.ceil(msec_remaining / 100) * 100)
+        draw_text(screen, str(msec_remaining), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
+
+    def export_csv(self, result_dict, filename):
+    
+        # Can adjust later to a customized file name
+        if os.path.exists(directory_name + filename):
+            with open(directory_name + filename, 'a') as f:
+                w = csv.writer(f)
+                w.writerows(result_dict.items())
+        else:
+            with open(directory_name + filename, 'w') as f:
+                w = csv.writer(f)
+                w.writerows(result_dict.items())
 '''
 @@@@@@@@@@@@@@@@@@@@@
 MAIN IMPLEMENTATION @
@@ -862,8 +735,6 @@ MAIN IMPLEMENTATION @
 '''
 
 def main():
-
-    initialize_experiment()
     # all_data = []
     #
     # for i in range(n_trials):
@@ -879,7 +750,9 @@ def main():
     #             np.random.uniform(safe_choice_time_bounds[0], safe_choice_time_bounds[1]), False)
     #     pygame.time.delay(time_between_trials)
 
-    run_resulaj_test()
+    #run_resulaj_test()
+    test_driver = resulaj()
+    test_driver.run()
     # pygame.time.delay(5)
 
     # safe_choice_score = 0
