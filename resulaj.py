@@ -550,6 +550,7 @@ class resulaj:
     def resulaj_trial(self, trial_num):
         # prepare variables for the trial`
         self.initialize_member_variables()
+        get_rel_bool = False
         coherence = np.random.choice(coherence_choices)
         target_selected = 0
         trial_dict = {} # where we will record all data for this trial, including the following...
@@ -584,10 +585,11 @@ class resulaj:
             self.check_events()
 
             # turn off stimulus if cursor moved and set time limit to select a target
-            if (pygame.mouse.get_rel() != (0,0)):
+            if (pygame.mouse.get_rel() != (0,0) and get_rel_bool):
                 # turn off stimulus
                 pygame.time.set_timer(self.stimulus_over_event, 1, True)
-
+            get_rel_bool = True
+            
             # collect dot and cursor positions if stimulus is on, else collect cursor positions while movement phase is active
             if (not self.stimulus_over):
                 dot_positions[self.current_time()] = dot_sets.get_dot_positions()
@@ -667,7 +669,7 @@ class resulaj:
         y_coord = cursor_start_position[1] - height
 
         if (cursor_start_position[1] - height - target_radius) < 0:
-            y_coord = 0.2 * monitor.current_h
+            y_coord = 0.15 * monitor.current_h
     
         # calculate x vals
         x_offset = target_dist*np.sin((np.pi/180) * target_angle)
