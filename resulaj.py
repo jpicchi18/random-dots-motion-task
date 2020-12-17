@@ -30,18 +30,24 @@ noise_update_type = "reset_location"   #how to update noise dots --> options:
                                                     # "incoherent_direction_update"
                                                     # "random_walk_update"
                                                     # "reset_location"
-dot_labels_fixed = False                                
 
-coherence_choices = [.5, 1] #[0, .016, .032, .064, .128, .256]
-time_between_trials = [0.7, 1.0] # time bounds, in seconds
-time_between_phases = 10 # in seconds; eg, the time between resulaj control and experiment
+dot_labels_fixed = False  # can coherent dots be reassigned as noise dots, and vice versa?
+
+coherence_choices = [0, .016, .032, .064, .128, .256]
+
+# trial timing parameters:
+time_targets_only = [700, 1000] # in msec. from literature "before stimulus appears, targets displayed for some time in exponential distribution with mean 0.82s and range 0.7-1.0s"
+time_stimulus_max = 2000 # in msec. from literature: "participants could view for as long as needed up to 2.0s"
+time_movement = [300, 700] # in msec. from literature: "movement duration (time between leaving home position and selecting a target) required to be 500+/-200ms"
+time_intertrial = 1000 # in msec
+time_target_feedback = 200 # in msec, the length of time that correct/incorrect target choices are displayed
+
 
 '''
 safe choice score values = [none, correct, wrong, safe]
 safe_choice_time_bounds = [min, max], where the time is selected randomly within that range
 '''
 safe_choice_scores = [-2, 1, -1, 0]
-trial_time = [20, 20]     # time length of a trial, where time is chosen randomly and uniformly between these these bounds
 
 '''
 Out of Bounds Decision
@@ -64,17 +70,10 @@ aperture_radius = 7    # aperture radius in visual angles
 
 frames_per_second = 75
 
-directory_name = ""
-
-target_angle = 28 # angle of target relative to vertical
-
-target_persistence_time = 1 # seconds that targets remain displayed after stimulus gets hidden
-
-change_mind_time = 3 # seconds that participant is given to change mind after initial target selection
-
+# target parameters
 target_radius = 1.5 # in cm
-
 target_dist_from_start = 20 # in cm
+target_angle = 28 # angle of target relative to vertical
 
 
 '''
@@ -99,19 +98,20 @@ GRAY = (128, 128, 128)
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
+GREEN = (0,128,0)
 
 dot_color = WHITE         #Color of the dots
 background_color = GRAY   #Color of the background
 initial_target_color = BLACK
 selected_target_color = BLUE
+correct_target_color = GREEN
+incorrect_target_color = RED
 
 aperture_center_x = x_screen_center      #NOTE: Aperture center is currently equal to center of
                                          #screen
 aperture_center_y = y_screen_center      # (in pixels)
 
 cwd = os.getcwd()
-
-target_radius = int(target_radius * 37.8)
 
 cursor_start_position = [0.5*monitor.current_w, .9*monitor.current_h]
 
@@ -204,10 +204,8 @@ def density_to_ndots(density, aperture_width_in_pixels):
    dots_per_frame = total_n_dots/frames_per_second
    return int(dots_per_frame)
 
-def fill_background():
-    screen.fill(background_color)
-    draw_start()
-    pygame.display.update()
+def cm_to_pixels(cm_value):
+    return int(37.795*cm_value)
 '''
 @@@@@@@@@@@@@@@@@@@@@@@
 MORE GLOBAL VARIABLES @
@@ -227,6 +225,7 @@ vertical_axis = aperture_axis[1]
 move_distance = angles_per_second_to_pixels_per_second(dot_speed)   # How many pixels the dots move per frame
 
 n_dots = density_to_ndots(dot_density, aperture_width)      # number of dots per set
+target_radius = cm_to_pixels(target_radius)
 
 '''
 @@@@@@@@@@@@@@@@@@@
@@ -510,8 +509,25 @@ class set_of_dot_sets:
 class resulaj:
     def __init__(self):
         self.make_data_dir()
-        self.clock = pygame.time.Clock()
+        self.clock = None
         self.left_target_coords, self.right_target_coords = self.get_target_positions()
+        self.is_right = 1
+
+        # data collection parameters
+        self.start_time = 0
+        self.stimulus_start_time = 0
+        self.stimulus_end_time = 0
+        self.movement_end_time = 0
+        self.feedback_end_time = 0
+        self.trial_end_time = 0
+
+        # trial-specific parameters
+        self.intertrial_period_over = False
+        self.stimulus_over = False
+        self.movement_over = False
+        self.intertrial_period_over_event = pygame.USEREVENT + 1
+        self.stimulus_over_event = pygame.USEREVENT + 2
+        self.movement_over_event = pygame.USEREVENT + 3
 
     def make_data_dir(self):
         experiment_num = 0
@@ -532,88 +548,62 @@ class resulaj:
             self.resulaj_trial(i)
     
     def resulaj_trial(self, trial_num):
-        #define relevant variables
+        # prepare variables for the trial`
+        self.initialize_member_variables()
         coherence = np.random.choice(coherence_choices)
-        is_right = np.random.choice([0,1])
-        time_btw_trials = np.random.uniform(time_between_trials[0], time_between_trials[1])
-        time_limit = np.random.uniform(trial_time[0], trial_time[1])
-
+        target_selected = 0
         trial_dict = {} # where we will record all data for this trial, including the following...
         dot_positions = {}
         cursor_positions = {}
-        waiting_period = False
-        stimulus_on = True
-        target_selected = 0
-        trial_done_time = time_limit + target_persistence_time + time_btw_trials # when to leave the function
-        experiment_done_time = time_limit + target_persistence_time # when to turn off stimulus and targets
-        end_time = 0
-        filename = "resulaj.csv"
-
-        # set the initial cursor position
-        pygame.mouse.set_pos(cursor_start_position)
-        pygame.mouse.get_rel()
+        filename = "resulaj_" + str(trial_num) + ".csv"
 
         # decide on the coherent direction
         coherent_direction = 0
-        if not is_right:
+        if not self.is_right:
             coherent_direction = 180
 
         # create and group together all sprites
         dot_sets = set_of_dot_sets(coherence, coherent_direction)
 
-        # Game loop
-        running = True
-        start_time = pygame.time.get_ticks() # in milliseconds
-        while running:
+        # before stimulus appears, targets are displayed for some time
+        self.only_targets_phase()
+        self.stimulus_start_time = self.current_time()
 
+        # set the initial cursor position again
+        pygame.mouse.set_pos(cursor_start_position)
+        pygame.mouse.get_rel()
+        
+        # schedule when the stimulus should stop
+        pygame.time.set_timer(self.stimulus_over_event, time_stimulus_max, True)
+
+        while not self.intertrial_period_over:
             # keep apropriate loop speed
             self.clock.tick(frames_per_second)
 
-            # get current time
-            current_time = pygame.time.get_ticks()-start_time
+            # check for early program termination or if the stimulus should stop due to time limits
+            self.check_events()
 
-            self.check_early_termination()
-
-            # end the trial if we've passed the post-trial break
-            if (current_time > trial_done_time*1000):
-                running = False
-                break
-
-            # enter the post-trial break if it's time to do so
-            if (current_time > experiment_done_time * 1000 and not waiting_period):
-                waiting_period = True
-                trial_done_time = current_time/1000 + time_btw_trials
-            
-            # turn off stimulus (not targets) if it's time to do so
-            if (current_time > time_limit*1000):
-                stimulus_on = False
-
-            # turn off stimulus if cursor moved
+            # turn off stimulus if cursor moved and set time limit to select a target
             if (pygame.mouse.get_rel() != (0,0)):
-                if (stimulus_on):
-                    experiment_done_time = current_time/1000 + target_persistence_time
-                    stimulus_on = False
+                # turn off stimulus
+                pygame.time.set_timer(self.stimulus_over_event, 1, True)
 
-            # collect dot and cursor positions if stimulus is off and experiment isn't over yet
-            if (not waiting_period and not stimulus_on):
-                dot_positions[current_time] = dot_sets.get_dot_positions()
-                cursor_positions[current_time] = pygame.mouse.get_pos()
+            # collect dot and cursor positions if stimulus is on, else collect cursor positions while movement phase is active
+            if (not self.stimulus_over):
+                dot_positions[self.current_time()] = dot_sets.get_dot_positions()
+            elif (self.stimulus_over and not self.movement_over):
+                cursor_positions[self.current_time()] = pygame.mouse.get_pos()
 
             # Update
             screen.fill(background_color)
-            if (not waiting_period):
+            if (not self.intertrial_period_over):
                 target_selected = self.draw_targets()
                 if (target_selected):
-                    waiting_period = True
-                    stimulus_on = False
-                    trial_done_time = current_time/1000 + time_btw_trials
-                    end_time = current_time
+                    pygame.time.set_timer(self.movement_over_event, 1, True)
                 
-                if stimulus_on:
+                if not self.stimulus_over:
                     dot_sets.update()
                     dot_sets.draw()
-                elif (not stimulus_on and not waiting_period):
-                    self.display_countdown(int(experiment_done_time - current_time/1000))
 
             # *after* drawing everything, flip the display
             pygame.display.update()
@@ -624,23 +614,24 @@ class resulaj:
         trial_dict['coherence'] = str(coherence) # float val of coherence messed up pandas
         trial_dict['dot_positions'] = dot_positions
         trial_dict['cursor_positions'] = cursor_positions
-        trial_dict['end_time'] = end_time
         trial_dict['target_selected'] = target_selected
-        trial_dict['is_right'] = is_right
-        
-        if (target_selected == is_right+1):
+        trial_dict['is_right'] = self.is_right
+        trial_dict['start_time'] = self.start_time
+        trial_dict['stimulus_start_time'] = self.stimulus_start_time
+        trial_dict['stimulus_end_time'] = self.stimulus_end_time
+        trial_dict['movement_end_time'] = self.movement_end_time
+        trial_dict['feedback_end_time'] = self.feedback_end_time
+        trial_dict['trial_end_time'] = self.trial_end_time
+
+        if (target_selected == self.is_right+1):
             trial_dict['is_correct'] = 1
         else:
             trial_dict['is_correct'] = 0
 
         self.export_csv(trial_dict, filename)
 
-        # split data for different trials into different csv files?
-
-        return 0
-
-    # exit the program if user closed the window or pressed the "esc" key
-    def check_early_termination(self):
+    # exit the program if user closed the window or pressed the "esc" key, or if the stimulus should stop
+    def check_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # check if user clicked the red x
                 pygame.quit()
@@ -651,6 +642,19 @@ class resulaj:
                     pygame.quit()
                     print("user-initiated program termination", file = sys.stderr)
                     exit(1)
+            elif event.type == self.stimulus_over_event and not self.stimulus_over:
+                self.stimulus_over = True
+                self.stimulus_end_time = self.current_time()
+                pygame.time.set_timer(self.movement_over_event, time_movement[1], True)
+            elif event.type == self.movement_over_event and not self.movement_over:
+                self.movement_over = True
+                self.movement_end_time = self.current_time()
+                self.target_feedback()
+                self.feedback_end_time = self.current_time()
+                # perform the intertrial period
+                self.intertrial_period()
+                self.intertrial_period_over = True
+                self.trial_end_time = self.current_time()
 
     # calculate positions for the left and right targets
     # return 2 lists, first one containing the left coordinates, second one with the right coordinates
@@ -676,10 +680,12 @@ class resulaj:
         # choose colors for left and right targets
         left_color = initial_target_color
         right_color = initial_target_color
-        if (target_selected == 1):
-            left_color = selected_target_color
-        elif (target_selected == 2):
-            right_color = selected_target_color
+        if self.movement_over and self.is_right:
+            left_color = incorrect_target_color
+            right_color = correct_target_color
+        elif self.movement_over and not self.is_right:
+            left_color = correct_target_color
+            right_color = incorrect_target_color
         
         # draw targets:
         pygame.draw.circle(screen, left_color, (self.left_target_coords[0], self.left_target_coords[1]), \
@@ -728,6 +734,62 @@ class resulaj:
             with open(directory_name + filename, 'w') as f:
                 w = csv.writer(f)
                 w.writerows(result_dict.items())
+
+    # only display the targets and nothing else for a certain period of time
+    def only_targets_phase(self):
+        # set the initial cursor position
+        pygame.mouse.set_pos(cursor_start_position)
+        
+        # display only the targets
+        screen.fill(background_color)
+        self.draw_targets()
+        pygame.display.update()
+
+        # wait for this period to end
+        tm_targets_only = np.random.randint(time_targets_only[0], time_targets_only[1])
+        pygame.time.wait(tm_targets_only)
+
+    def target_feedback(self):
+        screen.fill(background_color)
+        self.draw_targets()
+        pygame.display.update()
+
+        pygame.time.wait(time_target_feedback)
+
+    def intertrial_period(self):
+        screen.fill(background_color)
+        pygame.display.update()
+        pygame.time.wait(time_intertrial)
+
+    def cancel_scheduled_events(self):
+        pygame.time.set_timer(self.intertrial_period_over_event, 0)
+        pygame.time.set_timer(self.stimulus_over_event, 0)
+        pygame.time.set_timer(self.movement_over_event, 0)
+
+    def initialize_member_variables(self):
+        self.clock = pygame.time.Clock()
+        self.is_right = np.random.choice([0,1])
+
+        self.stimulus_over = False
+        self.movement_over = False
+        self.intertrial_period_over = False
+
+        self.stimulus_start_time = 0
+        self.stimulus_end_time = 0
+        self.movement_end_time = 0
+        self.feedback_end_time = 0
+        self.trial_end_time = 0
+
+        # clear the event queue to prepare for the trial
+        self.cancel_scheduled_events()
+        pygame.event.clear()
+
+        # set the start time
+        self.start_time = pygame.time.get_ticks() # in milliseconds
+
+    def current_time(self):
+        return pygame.time.get_ticks()-self.start_time
+
 '''
 @@@@@@@@@@@@@@@@@@@@@
 MAIN IMPLEMENTATION @
@@ -735,32 +797,9 @@ MAIN IMPLEMENTATION @
 '''
 
 def main():
-    # all_data = []
-    #
-    # for i in range(n_trials):
-    #     all_data.append(keypress_loop(np.random.rand(), np.random.choice([0, 1])))
-    #
-    # print(all_data)
 
-    # pygame.time.delay(5)
-    # safe_choice_score = 0
-    # for i in range(n_trials):
-    #     safe_choice_score = safe_choice(np.random.choice(coherence_choices), \
-    #         np.random.choice([0,1]), i, safe_choice_score, \
-    #             np.random.uniform(safe_choice_time_bounds[0], safe_choice_time_bounds[1]), False)
-    #     pygame.time.delay(time_between_trials)
-
-    #run_resulaj_test()
     test_driver = resulaj()
     test_driver.run()
-    # pygame.time.delay(5)
-
-    # safe_choice_score = 0
-    # for i in range(n_trials):
-    #     safe_choice_score = limit_mind_changes(np.random.choice(coherence_choices), \
-    #         np.random.choice([0,1]), i, safe_choice_score, \
-    #             np.random.uniform(safe_choice_time_bounds[0], safe_choice_time_bounds[1]), False, 3)
-    #     pygame.time.delay(time_between_trials)
 
     pygame.quit()
 
