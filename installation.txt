@@ -40,6 +40,7 @@ INSTALLING PYTHON AND VIRTUALENV FOR WINDOWS:
     (1) Download Python package from https://www.python.org/downloads/release/python-364/ and
         install it. Run cmd as administrator and run these commands...
 
+    (2) Try these commands. if they don't work, try the commands in step (3)
         pip install virtualenv
         cd path/to/rdm_repo/
         virtualenv -p path/to/python3/python.exe .env # This creates the virtual environment
@@ -47,3 +48,11 @@ INSTALLING PYTHON AND VIRTUALENV FOR WINDOWS:
         # run the python script rdm_repo/resulaj.py...
         pip install -r requirements.txt               # This installs all the packages
         .env\Scripts\deactivate.bat                   # This deactivates the virtual environment
+
+    (3) alternatively, try these commands:
+        rm -rf .env
+        py -m pip install virtualenv
+        py -m venv .env
+        ./.env/Scripts/activate
+        py -m pip install -r requirements.txt
+        py -m resulaj

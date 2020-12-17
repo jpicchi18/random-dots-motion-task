@@ -23,7 +23,7 @@ dot_density = 16.7      # measured in dots/(degree^2 * sec)
 n_sets = 1 # each contains n_dots dots. cycle between them in round-robin fashion. for n_sets=2, set 1 in frame 1, set 2 in frame 2, set 1 in frame 3, etc.
 
 dot_radius = 2              # Radius of each dot in pixels
-dot_life = 40               # How many frames a dot follows its trajectory before redrawn. -1
+dot_life = 20               # How many frames a dot follows its trajectory before redrawn. -1
                             # is infinite life
 dot_speed = 7.1     # in visual degrees per second
 noise_update_type = "reset_location"   #how to update noise dots --> options:
@@ -33,7 +33,7 @@ noise_update_type = "reset_location"   #how to update noise dots --> options:
 
 dot_labels_fixed = False  # can coherent dots be reassigned as noise dots, and vice versa?
 
-coherence_choices = [0, .016, .032, .064, .128, .256]
+coherence_choices = [0, .016, .032, .064, .128, .256, .512]
 
 # trial timing parameters:
 time_targets_only = [700, 1000] # in msec. from literature "before stimulus appears, targets displayed for some time in exponential distribution with mean 0.82s and range 0.7-1.0s"
@@ -665,6 +665,9 @@ class resulaj:
         # calculate y vals
         height = target_dist*np.cos((np.pi/180) * target_angle)
         y_coord = cursor_start_position[1] - height
+
+        if (cursor_start_position[1] - height - target_radius) < 0:
+            y_coord = 0.2 * monitor.current_h
     
         # calculate x vals
         x_offset = target_dist*np.sin((np.pi/180) * target_angle)
