@@ -1,0 +1,49 @@
+INSTALLING PYTHON FOR OS X:
+    (1) install homebrew via this link:
+        https://brew.sh/
+    
+    (2) install python3 with the following command:
+        brew install python3
+
+RUN THE SCRIPT ON MAC:
+    (1) add execute permissions to the bash script:
+        chmod a+x run_on_mac.sh
+
+    (2) run the bash script:
+        ./run_on_mac.sh
+
+(if bash script doesnt work) SETTING UP THE VIRTUAL ENVIRONMENT FOR OS X:
+    (1) navigate to the "rdm_repo" directory
+
+    (2) if the directory already contains a ".env" directory, delete it with this command:
+        rm -rf .env
+
+    (2) create the virtual environment with this command:
+        virtualenv -p python3 .env
+
+    (3) activate the virtual environment with this command:
+        source .env/bin/activate
+    
+    (4) install the necessary packages, using this command:
+        pip install -r requirements.txt
+
+    (5) run the python script with this command:
+        python3 path/to/repo/rdm_repo/resulaj.py
+
+    (6) deactivate the virtual environment when your finished running the trials, using this command:
+        deactivate
+
+    (6) to reactivate the virtual environment and run the script in the future, start from step (3) above.
+        you can skip step (4) because the packages will already be installed.
+
+INSTALLING PYTHON AND VIRTUALENV FOR WINDOWS:
+    (1) Download Python package from https://www.python.org/downloads/release/python-364/ and
+        install it. Run cmd as administrator and run these commands...
+
+        pip install virtualenv
+        cd path/to/rdm_repo/
+        virtualenv -p path/to/python3/python.exe .env # This creates the virtual environment
+        .env\Scripts\activate.bat                     # This activates the virtual environment
+        # run the python script rdm_repo/resulaj.py...
+        pip install -r requirements.txt               # This installs all the packages
+        .env\Scripts\deactivate.bat                   # This deactivates the virtual environment
