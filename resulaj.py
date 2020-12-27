@@ -508,6 +508,7 @@ class set_of_dot_sets:
 
 class resulaj:
     def __init__(self):
+        self.directory_name = ""
         self.make_data_dir()
         self.clock = None
         self.left_target_coords, self.right_target_coords = self.get_target_positions()
@@ -531,7 +532,6 @@ class resulaj:
 
     def make_data_dir(self):
         experiment_num = 0
-        global directory_name
         
         # create parent "data" directory, if needed
         if not os.path.exists(cwd + "/data"):
@@ -539,8 +539,8 @@ class resulaj:
 
         while os.path.exists(cwd + "/data/experiment_" + str(experiment_num)):
             experiment_num += 1
-        directory_name = cwd + "/data/experiment_" + str(experiment_num) + "/"
-        os.mkdir(directory_name)
+        self.directory_name = cwd + "/data/experiment_" + str(experiment_num)
+        os.mkdir(self.directory_name)
 
     # run however many resulaj_trials we want
     def run(self):
@@ -731,12 +731,13 @@ class resulaj:
     def export_csv(self, result_dict, filename):
     
         # Can adjust later to a customized file name
-        if os.path.exists(directory_name + filename):
-            with open(directory_name + filename, 'a') as f:
+        file_path = os.path.join(self.directory_name, filename)
+        if os.path.exists(file_path):
+            with open(file_path, 'a') as f:
                 w = csv.writer(f)
                 w.writerows(result_dict.items())
         else:
-            with open(directory_name + filename, 'w') as f:
+            with open(file_path, 'w') as f:
                 w = csv.writer(f)
                 w.writerows(result_dict.items())
 
