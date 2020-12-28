@@ -16,13 +16,13 @@ class all_data:
         self.data = {} # e.g. self.data[experiment_0] = {resulaj_0.csv: {trial_stats}}
         self.parse_data_dir()
         self.parse_csv_files()
-    
+
     def parse_data_dir(self):
         if not os.path.exists("data/"):
             error("no 'data/' directory in cwd")
         else:
             os.chdir("data/")
-        
+
         for dir in os.listdir():
             if not os.path.isdir(dir):
                 error("all files in 'data/' should be experiment directories: e.g. experiment_0")
@@ -42,9 +42,11 @@ class all_data:
                 # open csv file
                 with open(os.path.join(experiment, file), 'r') as csv_file:
                     csv_reader = csv.reader(csv_file, lineterminator = '\n')
-                    
+
                     self.data[experiment][file]['trial'] = file[-5]
                     for row in csv_reader:
+                        if(not row):
+                            continue
                         if re.match("Trial*", row[0]):
                             continue
                         elif row[0] == "cursor_positions" or row[0] == "dot_positions":
