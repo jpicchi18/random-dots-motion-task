@@ -19,7 +19,6 @@ class all_data:
 
     def parse_data_dir(self):
         if not os.path.exists("data/"):
-            print('hi')
             error("no 'data/' directory in cwd")
         else:
             print('bye')
@@ -59,8 +58,6 @@ class all_data:
 def main():
 
     csv_file = all_data()
-    csv_file.parse_data_dir()
-    csv_file.parse_csv_files()
 
 if __name__=='__main__':
     main()
