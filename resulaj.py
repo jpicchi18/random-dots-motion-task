@@ -613,6 +613,9 @@ class resulaj:
         trial_str = "Trial " + str(trial_num)
         trial_dict[trial_str] = ""
 
+        trial_dict['left_target_coord'] = self.left_target_coords
+        trial_dict['right_target_coord'] = self.right_target_coords
+        trial_dict['cursor_start_position'] = cursor_start_position
         trial_dict['coherence'] = str(coherence) # float val of coherence messed up pandas
         trial_dict['dot_positions'] = dot_positions
         trial_dict['cursor_positions'] = cursor_positions
