@@ -236,6 +236,11 @@ CLASS DEFINITIONS @
 @@@@@@@@@@@@@@@@@@@
 '''
 
+class cursor_follower(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+
+
 class dot(pygame.sprite.Sprite):
     def __init__(self, coherent_direction):
         pygame.sprite.Sprite.__init__(self)
@@ -614,6 +619,9 @@ class resulaj:
             # *after* drawing everything, flip the display
             pygame.display.update()
 
+        # rate confidence
+        self.rate_confidence_phase()
+
         trial_str = "Trial " + str(trial_num)
         trial_dict[trial_str] = ""
 
@@ -766,9 +774,49 @@ class resulaj:
     def display_risk_phase(self):
         # display only the targets
         screen.fill(background_color)
-        draw_text(screen, "risk value: " + str(np.random.choice(risk_options)), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
+        draw_text(screen, "risk value: " + str(np.random.choice(risk_options)), 40, monitor.current_w/2, monitor.current_h/2, WHITE)
         pygame.display.update()
         pygame.time.wait(time_risk_displayed)
+
+    def rate_confidence_phase(self):
+        line_height = monitor.current_h/2
+        left_endpoint = monitor.current_w*0.15
+        right_endpoint = monitor.current_w*0.85
+        line_width = right_endpoint - left_endpoint
+        confidence = 0
+
+        while True:
+            self.clock.tick(frames_per_second * 2)
+
+            # check for exit command
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: # check if user clicked the red x
+                    pygame.quit()
+                    print("user-initiated program termination", file = sys.stderr)
+                    exit(1)
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        return(confidence)
+
+            # get mouse position
+            x, y = pygame.mouse.get_pos()
+            if (x < left_endpoint):
+                x = left_endpoint
+            elif (x > right_endpoint):
+                x = right_endpoint
+            original_x = x
+
+            # calculate confidence value
+            confidence = round( (x - left_endpoint)/line_width * 100 )
+
+            # draw out everything
+            screen.fill(background_color)
+            draw_text(screen, "click spacebar when finished selecting confidence", 25, monitor.current_w/2, 9*monitor.current_h/10, WHITE)
+            draw_text(screen, "confidence selection: " + str(confidence), 25, monitor.current_w/2, monitor.current_h/8, WHITE)
+            pygame.draw.line(screen, WHITE, (left_endpoint, line_height), (right_endpoint, line_height))
+            pygame.draw.circle(screen, WHITE, (original_x, line_height), 20)
+            pygame.display.update()
+        
 
     def target_feedback(self):
         screen.fill(background_color)
