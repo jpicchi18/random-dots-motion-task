@@ -35,12 +35,15 @@ dot_labels_fixed = False  # can coherent dots be reassigned as noise dots, and v
 
 coherence_choices = [0, .016, .032, .064, .128, .256, .512]
 
+risk_options = [0, 4, 5, 7, 8]
+
 # trial timing parameters:
 time_targets_only = [700, 1000] # in msec. from literature "before stimulus appears, targets displayed for some time in exponential distribution with mean 0.82s and range 0.7-1.0s"
 time_stimulus_max = 2000 # in msec. from literature: "participants could view for as long as needed up to 2.0s"
 time_movement = [300, 700] # in msec. from literature: "movement duration (time between leaving home position and selecting a target) required to be 500+/-200ms"
 time_intertrial = 1000 # in msec
 time_target_feedback = 200 # in msec, the length of time that correct/incorrect target choices are displayed
+time_risk_displayed = 2000 # in msec
 
 
 '''
@@ -567,6 +570,7 @@ class resulaj:
         dot_sets = set_of_dot_sets(coherence, coherent_direction)
 
         # before stimulus appears, targets are displayed for some time
+        self.display_risk_phase()
         self.only_targets_phase()
         self.stimulus_start_time = self.current_time()
 
@@ -757,6 +761,12 @@ class resulaj:
         # wait for this period to end
         tm_targets_only = np.random.randint(time_targets_only[0], time_targets_only[1])
         pygame.time.wait(tm_targets_only)
+
+    def display_risk_phase(self):
+        # display only the targets
+        screen.fill(background_color)
+        pygame.display.update()
+        pygame.time.wait(time_risk_displayed)
 
     def target_feedback(self):
         screen.fill(background_color)
