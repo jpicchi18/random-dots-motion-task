@@ -761,10 +761,12 @@ class resulaj:
         # wait for this period to end
         tm_targets_only = np.random.randint(time_targets_only[0], time_targets_only[1])
         pygame.time.wait(tm_targets_only)
-
+ 
+    # state the risk value for this trial. keep it displayed for "time_risk_displayed" msecs
     def display_risk_phase(self):
         # display only the targets
         screen.fill(background_color)
+        draw_text(screen, "risk value: " + str(np.random.choice(risk_options)), 25, monitor.current_w/2, monitor.current_h/10, WHITE)
         pygame.display.update()
         pygame.time.wait(time_risk_displayed)
 
