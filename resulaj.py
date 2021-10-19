@@ -236,11 +236,6 @@ CLASS DEFINITIONS @
 @@@@@@@@@@@@@@@@@@@
 '''
 
-class cursor_follower(pygame.sprite.Sprite):
-    def __init__(self):
-        pygame.sprite.Sprite.__init__(self)
-
-
 class dot(pygame.sprite.Sprite):
     def __init__(self, coherent_direction):
         pygame.sprite.Sprite.__init__(self)
