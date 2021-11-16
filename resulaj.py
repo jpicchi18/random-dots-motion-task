@@ -10,7 +10,6 @@ import pygame
 import numpy as np
 import os
 import csv
-import time
 
 '''
 @@@@@@@@@@@@@@@@@@
@@ -35,7 +34,7 @@ dot_labels_fixed = False  # can coherent dots be reassigned as noise dots, and v
 
 coherence_choices = [0, .016, .032, .064, .128, .256, .512]
 
-risk_options = [0, 4, 5, 7, 8]
+risk_options = [0,1,2,3,4,5,6,7,8,9,10]
 
 # trial timing parameters:
 time_targets_only = [700, 1000] # in msec. from literature "before stimulus appears, targets displayed for some time in exponential distribution with mean 0.82s and range 0.7-1.0s"
@@ -78,6 +77,7 @@ target_radius = 1.5 # in cm
 target_dist_from_start = 20 # in cm
 target_angle = 28 # angle of target relative to vertical
 
+init_score = 100
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@@@@
@@ -516,6 +516,7 @@ class resulaj:
         self.clock = None
         self.left_target_coords, self.right_target_coords = self.get_target_positions()
         self.is_right = 1
+        self.score = init_score
 
         # data collection parameters
         self.start_time = 0
@@ -570,7 +571,7 @@ class resulaj:
         dot_sets = set_of_dot_sets(coherence, coherent_direction)
 
         # before stimulus appears, targets are displayed for some time
-        self.display_risk_phase()
+        risk = self.display_risk_phase()
         self.only_targets_phase()
         self.stimulus_start_time = self.current_time()
 
@@ -616,6 +617,15 @@ class resulaj:
 
         # rate confidence
         self.rate_confidence_phase()
+
+        # check if user made correct selection
+        if (target_selected == self.is_right+1):
+            is_correct = True
+        else:
+            is_correct = False
+
+        # display score
+        self.display_score_phase(risk, is_correct)
 
         trial_str = "Trial " + str(trial_num)
         trial_dict[trial_str] = ""
@@ -695,12 +705,14 @@ class resulaj:
         # choose colors for left and right targets
         left_color = initial_target_color
         right_color = initial_target_color
-        if self.movement_over and self.is_right:
-            left_color = incorrect_target_color
-            right_color = correct_target_color
-        elif self.movement_over and not self.is_right:
-            left_color = correct_target_color
-            right_color = incorrect_target_color
+
+        # COMMENTING OUT FEEDBACK WHEN TARGET SELECTED
+        # if self.movement_over and self.is_right:
+        #     left_color = incorrect_target_color
+        #     right_color = correct_target_color
+        # elif self.movement_over and not self.is_right:
+        #     left_color = correct_target_color
+        #     right_color = incorrect_target_color
         
         # draw targets:
         pygame.draw.circle(screen, left_color, (self.left_target_coords[0], self.left_target_coords[1]), \
@@ -766,12 +778,17 @@ class resulaj:
         pygame.time.wait(tm_targets_only)
  
     # state the risk value for this trial. keep it displayed for "time_risk_displayed" msecs
+    # returns risk value
     def display_risk_phase(self):
+        risk = np.random.choice(risk_options)
+
         # display only the targets
         screen.fill(background_color)
-        draw_text(screen, "risk value: " + str(np.random.choice(risk_options)), 40, monitor.current_w/2, monitor.current_h/2, WHITE)
+        draw_text(screen, "risk value: " + str(risk), 40, monitor.current_w/2, monitor.current_h/2, WHITE)
         pygame.display.update()
         pygame.time.wait(time_risk_displayed)
+
+        return risk
 
     def rate_confidence_phase(self):
         line_height = monitor.current_h/2
@@ -779,6 +796,8 @@ class resulaj:
         right_endpoint = monitor.current_w*0.85
         line_width = right_endpoint - left_endpoint
         confidence = 0
+        intervals = [left_endpoint, left_endpoint + line_width/4, left_endpoint + line_width/2, \
+            left_endpoint + 3*line_width/4, right_endpoint]
 
         while True:
             self.clock.tick(frames_per_second * 2)
@@ -802,16 +821,52 @@ class resulaj:
             original_x = x
 
             # calculate confidence value
-            confidence = round( (x - left_endpoint)/line_width * 100 )
+            confidence = 0
+            if (x >= intervals[3]):
+                confidence = 3
+            elif (x >= intervals[2]):
+                confidence = 2
+            elif (x >= intervals[1]):
+                confidence = 1
+            # confidence = round( (x - left_endpoint)/line_width * 100 )
 
             # draw out everything
             screen.fill(background_color)
             draw_text(screen, "click spacebar when finished selecting confidence", 25, monitor.current_w/2, 9*monitor.current_h/10, WHITE)
             draw_text(screen, "confidence selection: " + str(confidence), 25, monitor.current_w/2, monitor.current_h/8, WHITE)
             pygame.draw.line(screen, WHITE, (left_endpoint, line_height), (right_endpoint, line_height))
+
+            # draw intervals along line
+            pygame.draw.line(screen, WHITE, (intervals[0], line_height-20), (intervals[0], line_height+20))
+            pygame.draw.line(screen, WHITE, (intervals[1], line_height-20), (intervals[1], line_height+20))
+            pygame.draw.line(screen, WHITE, (intervals[2], line_height-20), (intervals[2], line_height+20))
+            pygame.draw.line(screen, WHITE, (intervals[3], line_height-20), (intervals[3], line_height+20))
+            pygame.draw.line(screen, WHITE, (intervals[4], line_height-20), (intervals[4], line_height+20))
+
+            # draw circle tracking cursor
             pygame.draw.circle(screen, WHITE, (original_x, line_height), 20)
             pygame.display.update()
         
+    def display_score_phase(self, risk, correct):
+        # update score
+        old_score = self.score
+        if correct:
+            risk_operator = "+"
+            risk_color = GREEN
+            self.score = old_score + risk
+        else:
+            risk_operator = "-"
+            risk_color = RED
+            self.score = old_score - risk
+
+        # display on screen
+        screen.fill(background_color)
+        draw_text(screen, "score:", 25, monitor.current_w/2, monitor.current_h/8, WHITE)
+        draw_text(screen, str(old_score), 25, monitor.current_w/2, monitor.current_h/6, WHITE)
+        draw_text(screen, risk_operator + str(risk), 25, monitor.current_w/2, monitor.current_h/5, risk_color)
+        draw_text(screen, "=" + str(self.score), 25, monitor.current_w/2, monitor.current_h/4, WHITE)
+        pygame.display.update()
+        pygame.time.wait(time_risk_displayed)
 
     def target_feedback(self):
         screen.fill(background_color)
