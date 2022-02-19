@@ -509,7 +509,7 @@ class set_of_dot_sets:
         # draw all dot sets
         self.set_of_dot_sets[self.current_set_index].draw()
 
-class resulaj:
+class experiment: 
     def __init__(self):
         self.directory_name = ""
         self.make_data_dir()
@@ -917,7 +917,7 @@ MAIN IMPLEMENTATION @
 
 def main():
 
-    test_driver = resulaj()
+    test_driver = experiment()
     test_driver.run()
 
     pygame.quit()
