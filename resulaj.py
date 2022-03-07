@@ -77,7 +77,8 @@ target_radius = 1.5 # in cm
 target_dist_from_start = 20 # in cm
 target_angle = 28 # angle of target relative to vertical
 
-init_score = 100
+init_risk_score = 0
+init_wager_score = 100
 
 '''
 @@@@@@@@@@@@@@@@@@@@@@@@@
@@ -516,7 +517,8 @@ class experiment:
         self.clock = None
         self.left_target_coords, self.right_target_coords = self.get_target_positions()
         self.is_right = 1
-        self.score = init_score
+        self.risk_score = init_risk_score
+        self.wager_score = init_wager_score
 
         # data collection parameters
         self.start_time = 0
@@ -549,9 +551,9 @@ class experiment:
     # run however many resulaj_trials we want
     def run(self):
         for i in range(n_trials):
-            self.resulaj_trial(i)
+            self.wager_trial(i)
     
-    def resulaj_trial(self, trial_num):
+    def risk_trial(self, trial_num):
         # prepare variables for the trial`
         self.initialize_member_variables()
         get_rel_bool = False
@@ -616,7 +618,7 @@ class experiment:
             pygame.display.update()
 
         # rate confidence
-        self.rate_confidence_phase()
+        confidence = self.rate_confidence_phase()
 
         # check if user made correct selection
         if (target_selected == self.is_right+1):
@@ -625,10 +627,11 @@ class experiment:
             is_correct = False
 
         # display score
-        self.display_score_phase(risk, is_correct)
+        self.display_score_phase_risk(risk, is_correct)
 
         trial_str = "Trial " + str(trial_num)
-        trial_dict[trial_str] = ""
+        trial_dict['trial'] = trial_num
+        trial_dict['type'] = 'risk'
 
         trial_dict['left_target_coord'] = self.left_target_coords
         trial_dict['right_target_coord'] = self.right_target_coords
@@ -644,6 +647,110 @@ class experiment:
         trial_dict['movement_end_time'] = self.movement_end_time
         trial_dict['feedback_end_time'] = self.feedback_end_time
         trial_dict['trial_end_time'] = self.trial_end_time
+        trial_dict['risk'] = risk
+        trial_dict['confidence'] = confidence
+
+        if (target_selected == self.is_right+1):
+            trial_dict['is_correct'] = 1
+        else:
+            trial_dict['is_correct'] = 0
+
+        self.export_csv(trial_dict, filename)
+
+    def wager_trial(self, trial_num):
+        # prepare variables for the trial`
+        self.initialize_member_variables()
+        get_rel_bool = False
+        coherence = np.random.choice(coherence_choices)
+        target_selected = 0
+        trial_dict = {} # where we will record all data for this trial, including the following...
+        dot_positions = {}
+        cursor_positions = {}
+        filename = "resulaj_" + str(trial_num) + ".csv"
+
+        # decide on the coherent direction
+        coherent_direction = 0
+        if not self.is_right:
+            coherent_direction = 180
+
+        # create and group together all sprites
+        dot_sets = set_of_dot_sets(coherence, coherent_direction)
+
+        # before stimulus appears, targets are displayed for some time
+        self.only_targets_phase()
+        self.stimulus_start_time = self.current_time()
+
+        # set the initial cursor position again
+        pygame.mouse.set_pos(cursor_start_position)
+        pygame.mouse.get_rel()
+        
+        # schedule when the stimulus should stop
+        pygame.time.set_timer(self.stimulus_over_event, time_stimulus_max, True)
+
+        while not self.intertrial_period_over:
+            # keep apropriate loop speed
+            self.clock.tick(frames_per_second)
+
+            # check for early program termination or if the stimulus should stop due to time limits
+            self.check_events()
+
+            # turn off stimulus if cursor moved and set time limit to select a target
+            if (pygame.mouse.get_rel() != (0,0) and get_rel_bool):
+                # turn off stimulus
+                pygame.time.set_timer(self.stimulus_over_event, 1, True)
+            get_rel_bool = True
+            
+            # collect dot and cursor positions if stimulus is on, else collect cursor positions while movement phase is active
+            if (not self.stimulus_over):
+                dot_positions[self.current_time()] = dot_sets.get_dot_positions()
+            elif (self.stimulus_over and not self.movement_over):
+                cursor_positions[self.current_time()] = pygame.mouse.get_pos()
+
+            # Update
+            screen.fill(background_color)
+            if (not self.intertrial_period_over):
+                target_selected = self.draw_targets()
+                if (target_selected):
+                    pygame.time.set_timer(self.movement_over_event, 1, True)
+                
+                if not self.stimulus_over:
+                    dot_sets.update()
+                    dot_sets.draw()
+
+            # *after* drawing everything, flip the display
+            pygame.display.update()
+
+        # rate confidence
+        wager = self.wager_phase()
+
+        # check if user made correct selection
+        if (target_selected == self.is_right+1):
+            is_correct = True
+        else:
+            is_correct = False
+
+        # display score
+        self.display_score_phase_wager(wager, is_correct)
+
+        trial_str = "Trial " + str(trial_num)
+        trial_dict['trial'] = trial_num
+        trial_dict['type'] = 'wager'
+
+        trial_dict['left_target_coord'] = self.left_target_coords
+        trial_dict['right_target_coord'] = self.right_target_coords
+        trial_dict['cursor_start_position'] = cursor_start_position
+        trial_dict['coherence'] = str(coherence) # float val of coherence messed up pandas
+        trial_dict['dot_positions'] = dot_positions
+        trial_dict['cursor_positions'] = cursor_positions
+        trial_dict['target_selected'] = target_selected
+        trial_dict['is_right'] = self.is_right
+        trial_dict['start_time'] = self.start_time
+        trial_dict['stimulus_start_time'] = self.stimulus_start_time
+        trial_dict['stimulus_end_time'] = self.stimulus_end_time
+        trial_dict['movement_end_time'] = self.movement_end_time
+        trial_dict['feedback_end_time'] = self.feedback_end_time
+        trial_dict['trial_end_time'] = self.trial_end_time
+        trial_dict['wager'] = wager
 
         if (target_selected == self.is_right+1):
             trial_dict['is_correct'] = 1
@@ -790,6 +897,7 @@ class experiment:
 
         return risk
 
+    # returns confidence level
     def rate_confidence_phase(self):
         line_height = monitor.current_h/2
         left_endpoint = monitor.current_w*0.15
@@ -847,24 +955,116 @@ class experiment:
             pygame.draw.circle(screen, WHITE, (original_x, line_height), 20)
             pygame.display.update()
         
-    def display_score_phase(self, risk, correct):
+    # returns wagered amount
+    def wager_phase(self):
+        line_height = monitor.current_h/2
+        left_endpoint = monitor.current_w*0.15
+        right_endpoint = monitor.current_w*0.85
+        line_width = right_endpoint - left_endpoint
+        wager = 0
+
+        # create intervals for each wager region
+        intervals = np.zeros(11)
+        intervals[0] = left_endpoint
+        for i in np.arange(1, 11):
+            intervals[i] = intervals[i-1] + line_width/10
+
+        while True:
+            self.clock.tick(frames_per_second * 2)
+
+            # check for exit command
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: # check if user clicked the red x
+                    pygame.quit()
+                    print("user-initiated program termination", file = sys.stderr)
+                    exit(1)
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        return(wager)
+
+            # get mouse position
+            x, y = pygame.mouse.get_pos()
+            if (x < left_endpoint):
+                x = left_endpoint
+            elif (x > right_endpoint):
+                x = right_endpoint
+            original_x = x
+
+            # calculate wager value
+            if (x >= intervals[9]):
+                wager = 10
+            elif (x >= intervals[8]):
+                wager = 9
+            elif (x >= intervals[7]):
+                wager = 8
+            elif (x >= intervals[6]):
+                wager = 7
+            elif (x >= intervals[5]):
+                wager = 6
+            elif (x >= intervals[4]):
+                wager = 5
+            elif (x >= intervals[3]):
+                wager = 4
+            elif (x >= intervals[2]):
+                wager = 3
+            elif (x >= intervals[1]):
+                wager = 2
+            elif (x >= intervals[0]):
+                wager = 1
+
+            # draw out everything
+            screen.fill(background_color)
+            draw_text(screen, "click spacebar when finished selecting confidence", 25, monitor.current_w/2, 9*monitor.current_h/10, WHITE)
+            draw_text(screen, "confidence selection: " + str(wager), 25, monitor.current_w/2, monitor.current_h/8, WHITE)
+            pygame.draw.line(screen, WHITE, (left_endpoint, line_height), (right_endpoint, line_height))
+
+            # draw intervals along line
+            for x_coord in intervals:
+                pygame.draw.line(screen, WHITE, (x_coord, line_height-20), (x_coord, line_height+20))
+
+            # draw circle tracking cursor
+            pygame.draw.circle(screen, WHITE, (original_x, line_height), 20)
+            pygame.display.update()
+
+    def display_score_phase_risk(self, risk, correct):
         # update score
-        old_score = self.score
+        old_score = self.risk_score
         if correct:
             risk_operator = "+"
             risk_color = GREEN
-            self.score = old_score + risk
+            self.risk_score = old_score + risk
         else:
             risk_operator = "-"
             risk_color = RED
-            self.score = old_score - risk
+            self.risk_score = old_score - risk
 
         # display on screen
         screen.fill(background_color)
         draw_text(screen, "score:", 25, monitor.current_w/2, monitor.current_h/8, WHITE)
         draw_text(screen, str(old_score), 25, monitor.current_w/2, monitor.current_h/6, WHITE)
         draw_text(screen, risk_operator + str(risk), 25, monitor.current_w/2, monitor.current_h/5, risk_color)
-        draw_text(screen, "=" + str(self.score), 25, monitor.current_w/2, monitor.current_h/4, WHITE)
+        draw_text(screen, "=" + str(self.risk_score), 25, monitor.current_w/2, monitor.current_h/4, WHITE)
+        pygame.display.update()
+        pygame.time.wait(time_risk_displayed)
+
+    def display_score_phase_wager(self, wager, correct):
+        # update score
+        old_score = self.wager_score
+        if correct:
+            risk_operator = "+"
+            risk_color = GREEN
+            self.wager_score = old_score + wager
+        else:
+            risk_operator = "-"
+            risk_color = RED
+            self.wager_score = old_score - wager
+
+        # display on screen
+        screen.fill(background_color)
+        draw_text(screen, "score:", 25, monitor.current_w/2, monitor.current_h/8, WHITE)
+        draw_text(screen, str(old_score), 25, monitor.current_w/2, monitor.current_h/6, WHITE)
+        draw_text(screen, risk_operator + str(wager), 25, monitor.current_w/2, monitor.current_h/5, risk_color)
+        draw_text(screen, "=" + str(self.wager_score), 25, monitor.current_w/2, monitor.current_h/4, WHITE)
         pygame.display.update()
         pygame.time.wait(time_risk_displayed)
 
